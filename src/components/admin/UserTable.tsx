@@ -21,6 +21,19 @@ interface UserTableProps {
   hasNextPage: boolean;
 }
 
+function formatLastSignIn(value: string | null): string {
+  if (!value) return "Nunca";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Nunca";
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
   return (
     <div className="space-y-4">
@@ -33,6 +46,7 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Páginas</TableHead>
+              <TableHead>Último login</TableHead>
               <TableHead className="pr-4 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -40,7 +54,7 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum usuário encontrado.
@@ -70,6 +84,12 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>{user.page_count}</TableCell>
+                  <TableCell
+                    className="whitespace-nowrap text-muted-foreground"
+                    suppressHydrationWarning
+                  >
+                    {formatLastSignIn(user.last_sign_in_at)}
+                  </TableCell>
                   <TableCell className="pr-4 text-right">
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/admin/usuarios/${user.id}`}>

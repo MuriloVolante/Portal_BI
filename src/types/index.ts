@@ -39,4 +39,6 @@ export interface AdminUserRow {
   created_at: string;
   /** Acesso desativado (ban no Supabase Auth). */
   banned: boolean;
+  /** Último login (Supabase Auth) — null se nunca entrou. */
+  last_sign_in_at: string | null;
 }

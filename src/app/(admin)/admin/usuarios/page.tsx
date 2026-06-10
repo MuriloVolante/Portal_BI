@@ -24,6 +24,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       page_count: demoCountPermissions(u.id),
       created_at: u.created_at,
       banned: false,
+      // No demo, o admin "entrou agora" e o usuário comum nunca entrou.
+      last_sign_in_at: u.role === "admin" ? new Date().toISOString() : null,
     }));
 
     return (
@@ -82,6 +84,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       page_count: countByUser.get(u.id) ?? 0,
       created_at: u.created_at,
       banned: Number.isFinite(bannedTs) && bannedTs > Date.now(),
+      last_sign_in_at: u.last_sign_in_at ?? null,
     };
   });
 
