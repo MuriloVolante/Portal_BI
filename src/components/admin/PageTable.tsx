@@ -57,17 +57,29 @@ const emptyForm: FormState = {
   is_active: true,
 };
 
+/** Gera um slug a partir do nome: "Relatório de Vendas" -> "relatorio-de-vendas". */
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function PageTable({ pages }: PageTableProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SidebarPage | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
+    setSlugTouched(false);
     setError(null);
     setOpen(true);
   }
@@ -82,6 +94,7 @@ export function PageTable({ pages }: PageTableProps) {
       order: page.order,
       is_active: page.is_active,
     });
+    setSlugTouched(true);
     setError(null);
     setOpen(true);
   }
@@ -217,22 +230,39 @@ export function PageTable({ pages }: PageTableProps) {
               <Input
                 id="label"
                 value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    label: e.target.value,
+                    // Preenche o slug automaticamente até o usuário editá-lo
+                    slug: slugTouched ? form.slug : slugify(e.target.value),
+                  })
+                }
                 placeholder="Vendas"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="slug">Slug (URL)</Label>
+              <Label htmlFor="slug">Identificador (slug)</Label>
               <Input
                 id="slug"
                 value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setForm({ ...form, slug: slugify(e.target.value) });
+                }}
                 placeholder="vendas"
                 pattern="[a-z0-9-]+"
                 title="Apenas letras minúsculas, números e hífens"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Vira o endereço da página:{" "}
+                <span className="font-mono">
+                  /dashboard/{form.slug || "vendas"}
+                </span>
+                . Não cole a URL do Power BI aqui — ela vai no campo abaixo.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="embed_url">URL de embed (Power BI)</Label>

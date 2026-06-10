@@ -170,12 +170,28 @@ interface PageInput {
   is_active: boolean;
 }
 
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function validateSlug(slug: string): string | null {
+  if (!SLUG_RE.test(slug)) {
+    return (
+      "Slug inválido. Use um identificador curto, só com letras minúsculas, " +
+      "números e hífens (ex.: vendas) — ele vira o endereço /dashboard/<slug>. " +
+      "A URL do Power BI vai no campo \"URL de embed\"."
+    );
+  }
+  return null;
+}
+
 export async function createPage(input: PageInput): Promise<ActionResult> {
   await assertAdmin();
 
   if (!input.slug || !input.label || !input.embed_url) {
     return { error: "Slug, nome e URL de embed são obrigatórios." };
   }
+
+  const slugError = validateSlug(input.slug);
+  if (slugError) return { error: slugError };
 
   if (isDemoMode) {
     const result = demoCreatePage(input);
@@ -214,6 +230,9 @@ export async function updatePage(
   if (!input.slug || !input.label) {
     return { error: "Slug e nome são obrigatórios." };
   }
+
+  const slugError = validateSlug(input.slug);
+  if (slugError) return { error: slugError };
 
   if (isDemoMode) {
     const result = demoUpdatePage(id, input);
