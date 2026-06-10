@@ -11,6 +11,7 @@ import {
   demoUpdatePage,
   isDemoMode,
 } from "@/lib/demo";
+import type { Role } from "@/types";
 
 interface ActionResult {
   error?: string;
@@ -23,6 +24,82 @@ async function assertAdmin() {
     throw new Error("Acesso negado");
   }
   return session;
+}
+
+// ---------- Usuários ----------
+
+export async function createUser(input: {
+  full_name: string;
+  email: string;
+  password: string;
+  role: Role;
+}): Promise<ActionResult> {
+  await assertAdmin();
+
+  if (isDemoMode) {
+    return { error: "Modo demo: criação de usuários requer o Supabase configurado." };
+  }
+  if (!input.email || !input.password) {
+    return { error: "Email e senha são obrigatórios." };
+  }
+  if (input.password.length < 6) {
+    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { full_name: input.full_name || null },
+  });
+
+  if (error || !data.user) {
+    const exists =
+      error?.code === "email_exists" ||
+      (error?.message ?? "").toLowerCase().includes("already");
+    return {
+      error: exists
+        ? "Já existe um usuário com esse email."
+        : "Não foi possível criar o usuário.",
+    };
+  }
+
+  // O trigger já criou o profile; garante nome e role escolhidos.
+  await admin.from("profiles").upsert({
+    id: data.user.id,
+    full_name: input.full_name || null,
+    role: input.role,
+  });
+
+  revalidatePath("/admin/usuarios");
+  return {};
+}
+
+export async function updateUserProfile(
+  userId: string,
+  input: { full_name: string; role: Role }
+): Promise<ActionResult> {
+  const session = await assertAdmin();
+
+  if (isDemoMode) {
+    return { error: "Modo demo: edição de usuários requer o Supabase configurado." };
+  }
+  if (session.user.id === userId && input.role !== "admin") {
+    return { error: "Você não pode remover seu próprio papel de admin." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: input.full_name || null, role: input.role })
+    .eq("id", userId);
+
+  if (error) return { error: "Não foi possível atualizar o usuário." };
+
+  revalidatePath("/admin/usuarios");
+  revalidatePath(`/admin/usuarios/${userId}`);
+  return {};
 }
 
 // ---------- Permissões de usuário ----------

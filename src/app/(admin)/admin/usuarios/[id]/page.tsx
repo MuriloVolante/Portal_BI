@@ -2,13 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getSessionInfo } from "@/lib/auth/session";
 import {
   demoGetUser,
   demoListPages,
   demoHasPermission,
   isDemoMode,
 } from "@/lib/demo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { PermissionToggle } from "@/components/admin/PermissionToggle";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
+import { UserProfileForm } from "@/components/admin/UserProfileForm";
 import type { Role, SidebarPage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,9 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
   if (!details) notFound();
   const { user, profile, allPages, allowedPageIds } = details;
 
+  const session = await getSessionInfo();
+  const isSelf = session?.user.id === user.id;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -103,23 +107,11 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
         <CardHeader>
           <CardTitle>Dados do usuário</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground">Nome</p>
-              <p className="font-medium">{profile?.full_name ?? "—"}</p>
-            </div>
             <div>
               <p className="text-muted-foreground">Email</p>
               <p className="font-medium">{user.email}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Role</p>
-              <Badge
-                variant={profile?.role === "admin" ? "default" : "secondary"}
-              >
-                {profile?.role ?? "user"}
-              </Badge>
             </div>
             <div>
               <p className="text-muted-foreground">Criado em</p>
@@ -128,7 +120,15 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
               </p>
             </div>
           </div>
-          <div className="pt-2">
+
+          <UserProfileForm
+            userId={user.id}
+            initialName={profile?.full_name ?? ""}
+            initialRole={profile?.role ?? "user"}
+            isSelf={isSelf}
+          />
+
+          <div className="border-t pt-4">
             <ResetPasswordButton email={user.email ?? ""} />
           </div>
         </CardContent>

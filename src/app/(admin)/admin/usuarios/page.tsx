@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { DEMO_USERS, demoCountPermissions, isDemoMode } from "@/lib/demo";
 import { UserTable } from "@/components/admin/UserTable";
+import { CreateUserDialog } from "@/components/admin/CreateUserDialog";
 import type { AdminUserRow, Role } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +27,14 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie quem acessa o portal e suas permissões.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
+            <p className="text-sm text-muted-foreground">
+              Gerencie quem acessa o portal e suas permissões.
+            </p>
+          </div>
+          <CreateUserDialog />
         </div>
         <UserTable rows={rows} currentPage={1} hasNextPage={false} />
       </div>
@@ -77,11 +81,14 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie quem acessa o portal e suas permissões.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie quem acessa o portal e suas permissões.
+          </p>
+        </div>
+        <CreateUserDialog />
       </div>
 
       <UserTable
