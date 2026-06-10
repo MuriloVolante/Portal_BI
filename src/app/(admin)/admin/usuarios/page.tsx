@@ -23,6 +23,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       role: u.role,
       page_count: demoCountPermissions(u.id),
       created_at: u.created_at,
+      banned: false,
     }));
 
     return (
@@ -70,14 +71,19 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
     countByUser.set(row.user_id, (countByUser.get(row.user_id) ?? 0) + 1);
   }
 
-  const rows: AdminUserRow[] = users.map((u) => ({
-    id: u.id,
-    email: u.email ?? "—",
-    full_name: profileById.get(u.id)?.full_name ?? null,
-    role: profileById.get(u.id)?.role ?? "user",
-    page_count: countByUser.get(u.id) ?? 0,
-    created_at: u.created_at,
-  }));
+  const rows: AdminUserRow[] = users.map((u) => {
+    const bannedUntil = (u as { banned_until?: string }).banned_until;
+    const bannedTs = bannedUntil ? new Date(bannedUntil).getTime() : NaN;
+    return {
+      id: u.id,
+      email: u.email ?? "—",
+      full_name: profileById.get(u.id)?.full_name ?? null,
+      role: profileById.get(u.id)?.role ?? "user",
+      page_count: countByUser.get(u.id) ?? 0,
+      created_at: u.created_at,
+      banned: Number.isFinite(bannedTs) && bannedTs > Date.now(),
+    };
+  });
 
   return (
     <div className="space-y-6">

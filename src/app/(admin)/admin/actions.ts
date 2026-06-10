@@ -102,6 +102,77 @@ export async function updateUserProfile(
   return {};
 }
 
+export async function setUserPassword(
+  userId: string,
+  password: string
+): Promise<ActionResult> {
+  await assertAdmin();
+
+  if (isDemoMode) {
+    return { error: "Modo demo: alteração de senha requer o Supabase configurado." };
+  }
+  if (!password || password.length < 6) {
+    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
+
+  if (error) return { error: "Não foi possível alterar a senha." };
+  return {};
+}
+
+/**
+ * Desativa (ou reativa) o acesso do usuário via ban no Supabase Auth.
+ * O middleware valida o usuário a cada requisição, então o bloqueio
+ * vale imediatamente — inclusive para sessões já abertas.
+ */
+export async function setUserBanned(
+  userId: string,
+  banned: boolean
+): Promise<ActionResult> {
+  const session = await assertAdmin();
+
+  if (isDemoMode) {
+    return { error: "Modo demo: desativação de usuários requer o Supabase configurado." };
+  }
+  if (session.user.id === userId) {
+    return { error: "Você não pode desativar a própria conta." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    // ~100 anos; "none" remove o ban
+    ban_duration: banned ? "876600h" : "none",
+  });
+
+  if (error) return { error: "Não foi possível atualizar o acesso do usuário." };
+
+  revalidatePath("/admin/usuarios");
+  revalidatePath(`/admin/usuarios/${userId}`);
+  return {};
+}
+
+export async function deleteUser(userId: string): Promise<ActionResult> {
+  const session = await assertAdmin();
+
+  if (isDemoMode) {
+    return { error: "Modo demo: exclusão de usuários requer o Supabase configurado." };
+  }
+  if (session.user.id === userId) {
+    return { error: "Você não pode excluir a própria conta." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+
+  if (error) return { error: "Não foi possível excluir o usuário." };
+
+  // profiles e user_pages caem em cascata (FK on delete cascade)
+  revalidatePath("/admin/usuarios");
+  return {};
+}
+
 // ---------- Permissões de usuário ----------
 
 export async function toggleUserPage(

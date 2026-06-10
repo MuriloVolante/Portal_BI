@@ -37,4 +37,6 @@ export interface AdminUserRow {
   role: Role;
   page_count: number;
   created_at: string;
+  /** Acesso desativado (ban no Supabase Auth). */
+  banned: boolean;
 }

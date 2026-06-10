@@ -31,6 +31,7 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
               <TableHead className="pl-4">Nome</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Páginas</TableHead>
               <TableHead className="pr-4 text-right">Ações</TableHead>
             </TableRow>
@@ -39,7 +40,7 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum usuário encontrado.
@@ -61,6 +62,11 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
                       variant={user.role === "admin" ? "default" : "secondary"}
                     >
                       {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.banned ? "destructive" : "secondary"}>
+                      {user.banned ? "desativado" : "ativo"}
                     </Badge>
                   </TableCell>
                   <TableCell>{user.page_count}</TableCell>

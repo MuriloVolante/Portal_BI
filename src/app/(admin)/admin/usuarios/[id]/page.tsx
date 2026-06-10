@@ -18,8 +18,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PermissionToggle } from "@/components/admin/PermissionToggle";
-import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 import { UserProfileForm } from "@/components/admin/UserProfileForm";
+import { UserSecurityActions } from "@/components/admin/UserSecurityActions";
 import type { Role, SidebarPage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,14 @@ interface UserDetails {
   profile: { full_name: string | null; role: Role } | null;
   allPages: SidebarPage[];
   allowedPageIds: Set<string>;
+  banned: boolean;
+}
+
+/** banned_until vem do Supabase Auth; no passado ou ausente = ativo. */
+function isBanned(user: { banned_until?: string }): boolean {
+  if (!user.banned_until) return false;
+  const until = new Date(user.banned_until).getTime();
+  return Number.isFinite(until) && until > Date.now();
 }
 
 async function getUserDetails(id: string): Promise<UserDetails | null> {
@@ -47,6 +55,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
       allowedPageIds: new Set(
         allPages.filter((p) => demoHasPermission(id, p.id)).map((p) => p.id)
       ),
+      banned: false,
     };
   }
 
@@ -74,13 +83,14 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
     profile: profile ?? null,
     allPages: (pages ?? []) as unknown as SidebarPage[],
     allowedPageIds: new Set((userPages ?? []).map((p) => p.page_id)),
+    banned: isBanned(user as { banned_until?: string }),
   };
 }
 
 export default async function UserEditPage({ params }: UserEditPageProps) {
   const details = await getUserDetails(params.id);
   if (!details) notFound();
-  const { user, profile, allPages, allowedPageIds } = details;
+  const { user, profile, allPages, allowedPageIds, banned } = details;
 
   const session = await getSessionInfo();
   const isSelf = session?.user.id === user.id;
@@ -127,10 +137,23 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
             initialRole={profile?.role ?? "user"}
             isSelf={isSelf}
           />
+        </CardContent>
+      </Card>
 
-          <div className="border-t pt-4">
-            <ResetPasswordButton email={user.email ?? ""} />
-          </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Acesso e segurança</CardTitle>
+          <CardDescription>
+            Senha, bloqueio de acesso e exclusão da conta.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UserSecurityActions
+            userId={user.id}
+            email={user.email ?? ""}
+            isSelf={isSelf}
+            initialBanned={banned}
+          />
         </CardContent>
       </Card>
 
