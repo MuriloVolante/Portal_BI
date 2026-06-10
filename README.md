@@ -35,45 +35,57 @@ Acesse `http://localhost:3000` e entre com:
 
 O modo demo usa dados em memória (3 páginas de exemplo apontando para o relatório público de demonstração do Power BI) e cobre todo o fluxo: login, sidebar com permissões, embed do dashboard e a área admin completa (toggles de permissão e CRUD de páginas). As alterações são perdidas ao reiniciar o servidor. **Não use em produção.**
 
-## Setup
+## 1. Configurar o Supabase
 
-### 1. Dependências
+1. Crie um projeto em [supabase.com](https://supabase.com) (anote a senha do banco).
+2. No painel do projeto, abra **SQL Editor → New query**, cole todo o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) e clique em **Run**.
+3. Em **Authentication → Sign In / Providers**, confirme que **Email** está habilitado. Se não quiser cadastro aberto, desative *Allow new users to sign up* — o admin cria os usuários pelo painel.
+4. Em **Authentication → URL Configuration**:
+   - **Site URL**: a URL do app na Vercel (ex.: `https://seu-portal.vercel.app`)
+   - **Redirect URLs**: adicione `https://seu-portal.vercel.app/reset-password` e, para dev, `http://localhost:3000/reset-password`
+5. Copie as credenciais em **Settings → API**:
+   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+   - `anon public` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `service_role` → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ secreta, nunca exponha no frontend)
+
+### Primeiro usuário admin
+
+1. **Authentication → Users → Add user → Create new user** (email + senha, marque *Auto Confirm User*).
+2. O profile é criado automaticamente por trigger. Promova-o no **SQL Editor**:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = (select id from auth.users where email = 'seu-email@empresa.com');
+```
+
+## 2. Deploy na Vercel
+
+1. Suba o repositório para o GitHub (já está pronto — basta fazer merge/push da branch principal).
+2. Em [vercel.com](https://vercel.com), **Add New → Project** e importe o repositório. A Vercel detecta Next.js sozinha — não mude build command nem output.
+3. Antes do deploy, em **Environment Variables**, adicione:
+
+| Nome | Valor |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL do Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave `anon public` |
+| `SUPABASE_SERVICE_ROLE_KEY` | chave `service_role` |
+
+4. Clique em **Deploy**.
+5. Com a URL final em mãos, volte ao Supabase e ajuste **Site URL** / **Redirect URLs** (passo 4 acima) se ainda apontam para outro endereço.
+
+Pronto: faça login com o admin e cadastre os dashboards em **Administração → Páginas** (cole a URL "Publicar na web" do Power BI no campo de embed).
+
+## 3. Rodar localmente (com o Supabase real)
+
+Crie um arquivo `.env.local` na raiz (use o `.env.example` como base) com as mesmas três variáveis e rode:
 
 ```bash
 npm install
-```
-
-### 2. Supabase
-
-1. Crie um projeto em [supabase.com](https://supabase.com).
-2. Rode a migration `supabase/migrations/0001_init.sql` no SQL Editor (ou via `supabase db push`).
-3. Em **Authentication → Providers**, mantenha Email habilitado.
-
-### 3. Variáveis de ambiente
-
-Copie `.env.example` para `.env.local` e preencha:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=        # usado apenas no servidor
-```
-
-### 4. Primeiro admin
-
-Crie um usuário (Authentication → Users → Add user) e promova-o:
-
-```sql
-update public.profiles set role = 'admin' where id = '<uuid-do-usuario>';
-```
-
-### 5. Rodar
-
-```bash
 npm run dev
 ```
 
-Acesse `http://localhost:3000`, faça login com o admin e cadastre as páginas em **Administração → Páginas**.
+> 💡 No Windows, crie/edite o `.env.local` pelo VS Code ou Bloco de Notas — não use `echo >` no PowerShell, que gera o arquivo em UTF-16 e o Next.js não lê as variáveis.
 
 ## Modelo de segurança
 

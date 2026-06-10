@@ -32,11 +32,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Variáveis de ambiente do Supabase ausentes. Configure NEXT_PUBLIC_SUPABASE_URL e " +
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY no .env.local (local) ou nas Environment Variables da Vercel. " +
+        "Para testar sem Supabase, use NEXT_PUBLIC_DEMO_MODE=true."
+    );
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
