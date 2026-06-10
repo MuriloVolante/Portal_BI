@@ -6,6 +6,32 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 const PUBLIC_PATHS = ["/login", "/reset-password"];
 
 export async function updateSession(request: NextRequest) {
+  // Rotas de API validam a própria sessão e respondem 401/403 em JSON.
+  if (request.nextUrl.pathname.startsWith("/api")) {
+    return NextResponse.next({ request });
+  }
+
+  // Modo demo: autenticação por cookie simples, sem Supabase.
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+    const hasSession = !!request.cookies.get("demo_session")?.value;
+    const { pathname } = request.nextUrl;
+    const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+    if (!hasSession && !isPublic) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    if (hasSession && pathname.startsWith("/login")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

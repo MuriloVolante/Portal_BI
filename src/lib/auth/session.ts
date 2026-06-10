@@ -1,5 +1,12 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import {
+  DEMO_SESSION_COOKIE,
+  demoGetUser,
+  demoProfileOf,
+  isDemoMode,
+} from "@/lib/demo";
 import type { Profile } from "@/types";
 import type { User } from "@supabase/supabase-js";
 
@@ -10,6 +17,20 @@ export interface SessionInfo {
 
 /** Retorna o usuário autenticado e seu profile, ou null. */
 export async function getSessionInfo(): Promise<SessionInfo | null> {
+  if (isDemoMode) {
+    const id = cookies().get(DEMO_SESSION_COOKIE)?.value;
+    const demoUser = demoGetUser(id);
+    if (!demoUser) return null;
+    return {
+      user: {
+        id: demoUser.id,
+        email: demoUser.email,
+        created_at: demoUser.created_at,
+      } as User,
+      profile: demoProfileOf(demoUser),
+    };
+  }
+
   const supabase = createClient();
 
   const {

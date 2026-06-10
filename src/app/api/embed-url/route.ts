@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import {
+  demoGetPageBySlug,
+  demoHasPermission,
+  isDemoMode,
+} from "@/lib/demo";
+import { getSessionInfo } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +23,25 @@ export async function GET(request: NextRequest) {
       { error: "pageSlug é obrigatório" },
       { status: 400 }
     );
+  }
+
+  // Modo demo: mesma lógica de validação, dados em memória.
+  if (isDemoMode) {
+    const session = await getSessionInfo();
+    if (!session) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+    const page = demoGetPageBySlug(pageSlug);
+    if (!page || !page.is_active) {
+      return NextResponse.json({ error: "Página não encontrada" }, { status: 404 });
+    }
+    const allowed =
+      session.profile?.role === "admin" ||
+      demoHasPermission(session.user.id, page.id);
+    if (!allowed) {
+      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    }
+    return NextResponse.json({ embedUrl: page.embed_url });
   }
 
   // 1. Valida a sessão do usuário

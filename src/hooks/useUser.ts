@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { isDemoMode } from "@/lib/demo";
 import type { Profile } from "@/types";
 
 interface UseUserResult {
@@ -20,8 +21,28 @@ export function useUser(): UseUserResult {
   });
 
   useEffect(() => {
-    const supabase = createClient();
     let cancelled = false;
+
+    if (isDemoMode) {
+      fetch("/api/demo/me")
+        .then(async (res) => {
+          if (cancelled) return;
+          if (!res.ok) {
+            setState({ user: null, profile: null, loading: false });
+            return;
+          }
+          const data = await res.json();
+          setState({ user: data.user, profile: data.profile, loading: false });
+        })
+        .catch(() => {
+          if (!cancelled) setState({ user: null, profile: null, loading: false });
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const supabase = createClient();
 
     async function load() {
       const {

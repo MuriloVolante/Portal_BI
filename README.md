@@ -11,6 +11,30 @@ Portal de dashboards Power BI com controle de acesso por usuário, construído c
 - 👥 Área admin: gestão de usuários, permissões por página (toggles) e CRUD de páginas
 - 🌑 Tema dark profissional com destaque verde `#399F39`
 
+## Teste rápido sem Supabase (modo demo)
+
+Quer ver o portal funcionando antes de configurar o Supabase? Crie um `.env.local` apenas com:
+
+```
+NEXT_PUBLIC_DEMO_MODE=true
+```
+
+E rode:
+
+```bash
+npm install
+npm run dev
+```
+
+Acesse `http://localhost:3000` e entre com:
+
+| Perfil | Email | Senha |
+|---|---|---|
+| Admin | `admin@demo.com` | `demo123` |
+| Usuário | `user@demo.com` | `demo123` |
+
+O modo demo usa dados em memória (3 páginas de exemplo apontando para o relatório público de demonstração do Power BI) e cobre todo o fluxo: login, sidebar com permissões, embed do dashboard e a área admin completa (toggles de permissão e CRUD de páginas). As alterações são perdidas ao reiniciar o servidor. **Não use em produção.**
+
 ## Setup
 
 ### 1. Dependências

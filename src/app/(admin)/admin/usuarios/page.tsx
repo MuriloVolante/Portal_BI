@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { DEMO_USERS, demoCountPermissions, isDemoMode } from "@/lib/demo";
 import { UserTable } from "@/components/admin/UserTable";
 import type { AdminUserRow, Role } from "@/types";
 
@@ -12,6 +13,30 @@ interface UsersPageProps {
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
   const currentPage = Math.max(1, Number(searchParams.page) || 1);
+
+  if (isDemoMode) {
+    const rows: AdminUserRow[] = DEMO_USERS.map((u) => ({
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      role: u.role,
+      page_count: demoCountPermissions(u.id),
+      created_at: u.created_at,
+    }));
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie quem acessa o portal e suas permissões.
+          </p>
+        </div>
+        <UserTable rows={rows} currentPage={1} hasNextPage={false} />
+      </div>
+    );
+  }
+
   const admin = createAdminClient();
 
   const { data: usersData } = await admin.auth.admin.listUsers({

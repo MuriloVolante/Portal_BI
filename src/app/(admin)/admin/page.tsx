@@ -2,6 +2,12 @@ import Link from "next/link";
 import { FileStack, KeySquare, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
+  DEMO_USERS,
+  demoCountPermissions,
+  demoListPages,
+  isDemoMode,
+} from "@/lib/demo";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -11,15 +17,28 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminOverviewPage() {
-  const admin = createAdminClient();
+async function getCounts() {
+  if (isDemoMode) {
+    return {
+      userCount: DEMO_USERS.length,
+      pageCount: demoListPages().length,
+      permissionCount: demoCountPermissions(),
+    };
+  }
 
+  const admin = createAdminClient();
   const [{ count: userCount }, { count: pageCount }, { count: permissionCount }] =
     await Promise.all([
       admin.from("profiles").select("id", { count: "exact", head: true }),
       admin.from("pages").select("id", { count: "exact", head: true }),
       admin.from("user_pages").select("id", { count: "exact", head: true }),
     ]);
+
+  return { userCount, pageCount, permissionCount };
+}
+
+export default async function AdminOverviewPage() {
+  const { userCount, pageCount, permissionCount } = await getCounts();
 
   const cards = [
     {

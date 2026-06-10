@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { demoAllowedPages, isDemoMode } from "@/lib/demo";
 import { LayoutDashboard } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +12,15 @@ export const dynamic = "force-dynamic";
  */
 export default async function HomePage() {
   const { user, profile } = await requireUser();
-  const supabase = createClient();
 
   let firstSlug: string | null = null;
 
-  if (profile?.role === "admin") {
+  if (isDemoMode) {
+    firstSlug =
+      demoAllowedPages(user.id, profile?.role ?? "user")[0]?.slug ?? null;
+    if (!firstSlug && profile?.role === "admin") redirect("/admin");
+  } else if (profile?.role === "admin") {
+    const supabase = createClient();
     const { data } = await supabase
       .from("pages")
       .select("slug")
@@ -26,6 +31,7 @@ export default async function HomePage() {
     firstSlug = data?.slug ?? null;
     if (!firstSlug) redirect("/admin");
   } else {
+    const supabase = createClient();
     const { data } = await supabase
       .from("user_pages")
       .select("page:pages(slug, order, is_active)")

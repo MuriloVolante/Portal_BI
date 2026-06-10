@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getSessionInfo } from "@/lib/auth/session";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import {
+  demoCreatePage,
+  demoDeletePage,
+  demoTogglePermission,
+  demoUpdatePage,
+  isDemoMode,
+} from "@/lib/demo";
 
 interface ActionResult {
   error?: string;
@@ -26,6 +33,14 @@ export async function toggleUserPage(
   enabled: boolean
 ): Promise<ActionResult> {
   await assertAdmin();
+
+  if (isDemoMode) {
+    demoTogglePermission(userId, pageId, enabled);
+    revalidatePath(`/admin/usuarios/${userId}`);
+    revalidatePath("/admin/usuarios");
+    return {};
+  }
+
   const admin = createAdminClient();
 
   if (enabled) {
@@ -53,6 +68,10 @@ export async function toggleUserPage(
 export async function sendPasswordReset(email: string): Promise<ActionResult> {
   await assertAdmin();
 
+  if (isDemoMode) {
+    return { error: "Modo demo: redefinição de senha requer o Supabase configurado." };
+  }
+
   const origin = headers().get("origin") ?? "";
   const supabase = createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -79,6 +98,12 @@ export async function createPage(input: PageInput): Promise<ActionResult> {
 
   if (!input.slug || !input.label || !input.embed_url) {
     return { error: "Slug, nome e URL de embed são obrigatórios." };
+  }
+
+  if (isDemoMode) {
+    const result = demoCreatePage(input);
+    if (!result.error) revalidatePath("/admin/paginas");
+    return result;
   }
 
   const admin = createAdminClient();
@@ -113,6 +138,12 @@ export async function updatePage(
     return { error: "Slug e nome são obrigatórios." };
   }
 
+  if (isDemoMode) {
+    const result = demoUpdatePage(id, input);
+    if (!result.error) revalidatePath("/admin/paginas");
+    return result;
+  }
+
   const update: Record<string, unknown> = {
     slug: input.slug,
     label: input.label,
@@ -143,6 +174,12 @@ export async function updatePage(
 
 export async function deletePage(id: string): Promise<ActionResult> {
   await assertAdmin();
+
+  if (isDemoMode) {
+    demoDeletePage(id);
+    revalidatePath("/admin/paginas");
+    return {};
+  }
 
   const admin = createAdminClient();
   const { error } = await admin.from("pages").delete().eq("id", id);

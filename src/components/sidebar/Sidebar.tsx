@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BarChart3, LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DEMO_SESSION_COOKIE, isDemoMode } from "@/lib/demo";
 import { useUser } from "@/hooks/useUser";
 import { useAllowedPages } from "@/hooks/useAllowedPages";
 import { SidebarNavItem } from "./SidebarNavItem";
@@ -20,8 +21,12 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    if (isDemoMode) {
+      document.cookie = `${DEMO_SESSION_COOKIE}=; path=/; max-age=0`;
+    } else {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    }
     router.push("/login");
     router.refresh();
   }

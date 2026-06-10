@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BarChart3, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DEMO_PASSWORD,
+  DEMO_SESSION_COOKIE,
+  demoFindUserByEmail,
+  isDemoMode,
+} from "@/lib/demo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +35,19 @@ export default function LoginPage() {
     setInfo(null);
     setLoading(true);
 
+    if (isDemoMode) {
+      const demoUser = demoFindUserByEmail(email);
+      if (!demoUser || password !== DEMO_PASSWORD) {
+        setError("Email ou senha inválidos.");
+        setLoading(false);
+        return;
+      }
+      document.cookie = `${DEMO_SESSION_COOKIE}=${demoUser.id}; path=/`;
+      router.push("/");
+      router.refresh();
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -48,6 +67,11 @@ export default function LoginPage() {
   async function handleForgotPassword() {
     setError(null);
     setInfo(null);
+
+    if (isDemoMode) {
+      setInfo("Modo demo: a redefinição de senha fica disponível com o Supabase configurado.");
+      return;
+    }
 
     if (!email) {
       setError("Informe seu email para redefinir a senha.");
@@ -132,6 +156,19 @@ export default function LoginPage() {
               Esqueci minha senha
             </Button>
           </form>
+
+          {isDemoMode && (
+            <div className="mt-4 rounded-md border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground">
+              <p className="mb-1 font-semibold text-primary">Modo demo ativo</p>
+              <p>
+                admin: <span className="font-mono">admin@demo.com</span>
+                <br />
+                usuário: <span className="font-mono">user@demo.com</span>
+                <br />
+                senha: <span className="font-mono">demo123</span>
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

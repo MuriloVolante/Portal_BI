@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { isDemoMode } from "@/lib/demo";
 import type { SidebarPage } from "@/types";
 
 // Colunas seguras — embed_url nunca é selecionada no cliente.
@@ -22,8 +23,28 @@ export function useAllowedPages(): UseAllowedPagesResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
     let cancelled = false;
+
+    if (isDemoMode) {
+      fetch("/api/demo/me")
+        .then(async (res) => {
+          if (cancelled) return;
+          const data = res.ok ? await res.json() : { pages: [] };
+          setPages(data.pages ?? []);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPages([]);
+            setLoading(false);
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const supabase = createClient();
 
     async function load() {
       const {

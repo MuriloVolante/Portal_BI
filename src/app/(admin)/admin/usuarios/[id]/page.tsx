@@ -2,6 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
+import {
+  demoGetUser,
+  demoListPages,
+  demoHasPermission,
+  isDemoMode,
+} from "@/lib/demo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,13 +27,31 @@ interface UserEditPageProps {
   params: { id: string };
 }
 
-export default async function UserEditPage({ params }: UserEditPageProps) {
-  const admin = createAdminClient();
+interface UserDetails {
+  user: { id: string; email?: string; created_at: string };
+  profile: { full_name: string | null; role: Role } | null;
+  allPages: SidebarPage[];
+  allowedPageIds: Set<string>;
+}
 
-  const { data: userData, error } = await admin.auth.admin.getUserById(
-    params.id
-  );
-  if (error || !userData?.user) notFound();
+async function getUserDetails(id: string): Promise<UserDetails | null> {
+  if (isDemoMode) {
+    const demoUser = demoGetUser(id);
+    if (!demoUser) return null;
+    const allPages = demoListPages();
+    return {
+      user: demoUser,
+      profile: { full_name: demoUser.full_name, role: demoUser.role },
+      allPages,
+      allowedPageIds: new Set(
+        allPages.filter((p) => demoHasPermission(id, p.id)).map((p) => p.id)
+      ),
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: userData, error } = await admin.auth.admin.getUserById(id);
+  if (error || !userData?.user) return null;
   const user = userData.user;
 
   const [{ data: profile }, { data: pages }, { data: userPages }] =
@@ -44,8 +68,18 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
       admin.from("user_pages").select("page_id").eq("user_id", user.id),
     ]);
 
-  const allowedPageIds = new Set((userPages ?? []).map((p) => p.page_id));
-  const allPages = (pages ?? []) as unknown as SidebarPage[];
+  return {
+    user,
+    profile: profile ?? null,
+    allPages: (pages ?? []) as unknown as SidebarPage[],
+    allowedPageIds: new Set((userPages ?? []).map((p) => p.page_id)),
+  };
+}
+
+export default async function UserEditPage({ params }: UserEditPageProps) {
+  const details = await getUserDetails(params.id);
+  if (!details) notFound();
+  const { user, profile, allPages, allowedPageIds } = details;
 
   return (
     <div className="space-y-6">
