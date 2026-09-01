@@ -10,6 +10,7 @@ import {
   demoFindUserByEmail,
   isDemoMode,
 } from "@/lib/demo";
+import { APP_VERSION } from "@/lib/version";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,7 +94,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm animate-fade-in">
+      <div className="w-full max-w-sm">
+        <Card className="animate-fade-in">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15">
             <BarChart3 className="h-6 w-6 text-primary" />
@@ -171,6 +173,10 @@ export default function LoginPage() {
           )}
         </CardContent>
       </Card>
+        <p className="mt-4 text-center text-xs text-muted-foreground/60">
+          v{APP_VERSION}
+        </p>
+      </div>
     </div>
   );
 }

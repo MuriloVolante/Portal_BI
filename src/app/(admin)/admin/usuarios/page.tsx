@@ -26,6 +26,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       banned: false,
       // No demo, o admin "entrou agora" e o usuário comum nunca entrou.
       last_sign_in_at: u.role === "admin" ? new Date().toISOString() : null,
+      last_seen_at: null,
     }));
 
     return (
@@ -57,7 +58,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const [{ data: profiles }, { data: permissions }] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, role")
+      .select("id, full_name, role, last_seen_at")
       .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
     admin
       .from("user_pages")
@@ -66,7 +67,15 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   ]);
 
   const profileById = new Map(
-    (profiles ?? []).map((p) => [p.id, p as { id: string; full_name: string | null; role: Role }])
+    (profiles ?? []).map((p) => [
+      p.id,
+      p as {
+        id: string;
+        full_name: string | null;
+        role: Role;
+        last_seen_at: string | null;
+      },
+    ])
   );
   const countByUser = new Map<string, number>();
   for (const row of permissions ?? []) {
@@ -85,6 +94,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       created_at: u.created_at,
       banned: Number.isFinite(bannedTs) && bannedTs > Date.now(),
       last_sign_in_at: u.last_sign_in_at ?? null,
+      last_seen_at: profileById.get(u.id)?.last_seen_at ?? null,
     };
   });
 

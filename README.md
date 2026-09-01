@@ -38,7 +38,7 @@ O modo demo usa dados em memória (3 páginas de exemplo apontando para o relat�
 ## 1. Configurar o Supabase
 
 1. Crie um projeto em [supabase.com](https://supabase.com) (anote a senha do banco).
-2. No painel do projeto, abra **SQL Editor → New query**, cole todo o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) e clique em **Run**.
+2. No painel do projeto, abra **SQL Editor → New query** e rode, em ordem, cada arquivo de [`supabase/migrations/`](supabase/migrations/) (cole o conteúdo e clique em **Run**). Em projetos já em produção, rode apenas as migrations que ainda não foram aplicadas.
 3. Em **Authentication → Sign In / Providers**, confirme que **Email** está habilitado. Se não quiser cadastro aberto, desative *Allow new users to sign up* — o admin cria os usuários pelo painel.
 4. Em **Authentication → URL Configuration**:
    - **Site URL**: a URL do app na Vercel (ex.: `https://seu-portal.vercel.app`)

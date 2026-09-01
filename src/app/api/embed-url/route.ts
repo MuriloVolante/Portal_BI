@@ -58,9 +58,14 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const { data: page } = await admin
     .from("pages")
-    .select("id, embed_url, is_active")
+    .select("id, label, embed_url, is_active")
     .eq("slug", pageSlug)
-    .maybeSingle<{ id: string; embed_url: string; is_active: boolean }>();
+    .maybeSingle<{
+      id: string;
+      label: string;
+      embed_url: string;
+      is_active: boolean;
+    }>();
 
   if (!page || !page.is_active) {
     return NextResponse.json(
@@ -87,6 +92,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }
   }
+
+  // 4. Registra o acesso: último acesso no profile + linha no histórico.
+  // Falhas aqui não bloqueiam o dashboard (supabase-js não lança exceção).
+  await Promise.all([
+    admin
+      .from("profiles")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("id", user.id),
+    admin.from("access_logs").insert({
+      user_id: user.id,
+      page_id: page.id,
+      page_label: page.label,
+    }),
+  ]);
 
   return NextResponse.json({ embedUrl: page.embed_url });
 }

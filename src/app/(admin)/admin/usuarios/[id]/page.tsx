@@ -20,6 +20,10 @@ import {
 import { PermissionToggle } from "@/components/admin/PermissionToggle";
 import { UserProfileForm } from "@/components/admin/UserProfileForm";
 import { UserSecurityActions } from "@/components/admin/UserSecurityActions";
+import {
+  ActivityList,
+  type ActivityEntry,
+} from "@/components/admin/ActivityList";
 import type { Role, SidebarPage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +38,7 @@ interface UserDetails {
   allPages: SidebarPage[];
   allowedPageIds: Set<string>;
   banned: boolean;
+  activity: ActivityEntry[];
 }
 
 /** banned_until vem do Supabase Auth; no passado ou ausente = ativo. */
@@ -56,6 +61,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
         allPages.filter((p) => demoHasPermission(id, p.id)).map((p) => p.id)
       ),
       banned: false,
+      activity: [],
     };
   }
 
@@ -64,7 +70,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
   if (error || !userData?.user) return null;
   const user = userData.user;
 
-  const [{ data: profile }, { data: pages }, { data: userPages }] =
+  const [{ data: profile }, { data: pages }, { data: userPages }, { data: logs }] =
     await Promise.all([
       admin
         .from("profiles")
@@ -76,21 +82,36 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
         .select('id, slug, label, icon, "order", is_active, created_at')
         .order("order", { ascending: true }),
       admin.from("user_pages").select("page_id").eq("user_id", user.id),
+      admin
+        .from("access_logs")
+        .select("id, page_id, page_label, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(15),
     ]);
+
+  const allPages = (pages ?? []) as unknown as SidebarPage[];
+  const iconByPageId = new Map(allPages.map((p) => [p.id, p.icon]));
 
   return {
     user,
     profile: profile ?? null,
-    allPages: (pages ?? []) as unknown as SidebarPage[],
+    allPages,
     allowedPageIds: new Set((userPages ?? []).map((p) => p.page_id)),
     banned: isBanned(user as { banned_until?: string }),
+    activity: (logs ?? []).map((log) => ({
+      id: log.id,
+      page_label: log.page_label,
+      icon: log.page_id ? iconByPageId.get(log.page_id) : null,
+      created_at: log.created_at,
+    })),
   };
 }
 
 export default async function UserEditPage({ params }: UserEditPageProps) {
   const details = await getUserDetails(params.id);
   if (!details) notFound();
-  const { user, profile, allPages, allowedPageIds, banned } = details;
+  const { user, profile, allPages, allowedPageIds, banned, activity } = details;
 
   const session = await getSessionInfo();
   const isSelf = session?.user.id === user.id;
@@ -154,6 +175,18 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
             isSelf={isSelf}
             initialBanned={banned}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Atividade recente</CardTitle>
+          <CardDescription>
+            Últimos dashboards abertos por este usuário.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActivityList entries={activity} />
         </CardContent>
       </Card>
 

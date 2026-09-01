@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
+import { APP_VERSION } from "@/lib/version";
 import { AdminNav } from "@/components/admin/AdminNav";
 
 export default async function AdminLayout({
@@ -33,12 +34,18 @@ export default async function AdminLayout({
             <ArrowLeft className="h-4 w-4 shrink-0" />
             Voltar ao portal
           </Link>
+          <p className="px-3 pt-2 text-xs text-muted-foreground/70">
+            Portal BI v{APP_VERSION}
+          </p>
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl p-6 md:p-10 animate-fade-in">
           {children}
+          <p className="pt-8 text-center text-xs text-muted-foreground/60 md:hidden">
+            Portal BI v{APP_VERSION}
+          </p>
         </div>
       </main>
     </div>

@@ -21,7 +21,7 @@ interface UserTableProps {
   hasNextPage: boolean;
 }
 
-function formatLastSignIn(value: string | null): string {
+function formatDateTime(value: string | null): string {
   if (!value) return "Nunca";
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "Nunca";
@@ -46,7 +46,7 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Páginas</TableHead>
-              <TableHead>Último login</TableHead>
+              <TableHead>Último acesso</TableHead>
               <TableHead className="pr-4 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -88,7 +88,9 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
                     className="whitespace-nowrap text-muted-foreground"
                     suppressHydrationWarning
                   >
-                    {formatLastSignIn(user.last_sign_in_at)}
+                    {/* Uso real (abertura de dashboard); antes do primeiro
+                        registro, cai no último login do Auth */}
+                    {formatDateTime(user.last_seen_at ?? user.last_sign_in_at)}
                   </TableCell>
                   <TableCell className="pr-4 text-right">
                     <Button asChild variant="outline" size="sm">
