@@ -24,6 +24,7 @@ import {
   ActivityList,
   type ActivityEntry,
 } from "@/components/admin/ActivityList";
+import { formatDateBR } from "@/lib/utils";
 import type { Role, SidebarPage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -146,9 +147,7 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
             </div>
             <div>
               <p className="text-muted-foreground">Criado em</p>
-              <p className="font-medium">
-                {new Date(user.created_at).toLocaleDateString("pt-BR")}
-              </p>
+              <p className="font-medium">{formatDateBR(user.created_at)}</p>
             </div>
           </div>
 

@@ -1,24 +1,13 @@
 "use client";
 
 import { icons, LayoutDashboard } from "lucide-react";
+import { formatDateTimeBR } from "@/lib/utils";
 
 export interface ActivityEntry {
   id: string;
   page_label: string;
   icon?: string | null;
   created_at: string;
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "—";
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 /** Últimos dashboards abertos pelo usuário (dados de access_logs). */
@@ -47,11 +36,8 @@ export function ActivityList({ entries }: { entries: ActivityEntry[] }) {
               <Icon className="h-4 w-4 text-muted-foreground" />
               {entry.page_label}
             </span>
-            <span
-              className="whitespace-nowrap text-sm text-muted-foreground"
-              suppressHydrationWarning
-            >
-              {formatDateTime(entry.created_at)}
+            <span className="whitespace-nowrap text-sm text-muted-foreground">
+              {formatDateTimeBR(entry.created_at, "—")}
             </span>
           </li>
         );

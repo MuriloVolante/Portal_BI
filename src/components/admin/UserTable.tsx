@@ -13,25 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import { formatDateTimeBR } from "@/lib/utils";
 import type { AdminUserRow } from "@/types";
 
 interface UserTableProps {
   rows: AdminUserRow[];
   currentPage: number;
   hasNextPage: boolean;
-}
-
-function formatDateTime(value: string | null): string {
-  if (!value) return "Nunca";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Nunca";
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
@@ -84,13 +72,10 @@ export function UserTable({ rows, currentPage, hasNextPage }: UserTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>{user.page_count}</TableCell>
-                  <TableCell
-                    className="whitespace-nowrap text-muted-foreground"
-                    suppressHydrationWarning
-                  >
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
                     {/* Uso real (abertura de dashboard); antes do primeiro
                         registro, cai no último login do Auth */}
-                    {formatDateTime(user.last_seen_at ?? user.last_sign_in_at)}
+                    {formatDateTimeBR(user.last_seen_at ?? user.last_sign_in_at)}
                   </TableCell>
                   <TableCell className="pr-4 text-right">
                     <Button asChild variant="outline" size="sm">
