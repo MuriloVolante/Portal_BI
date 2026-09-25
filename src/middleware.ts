@@ -11,7 +11,8 @@ export const config = {
      * Protege tudo, exceto:
      * - _next/static, _next/image (assets)
      * - favicon e arquivos públicos
+     * - manifest do PWA (o navegador busca sem cookies de sessão)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
