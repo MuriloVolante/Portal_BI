@@ -10,7 +10,7 @@ import {
   demoFindUserByEmail,
   isDemoMode,
 } from "@/lib/demo";
-import { checkPasswordReset, resetPasswordWithWindow } from "../actions";
+import { checkLoginEmail, resetPasswordWithWindow } from "../actions";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label";
 
 /**
  * Login em etapas (estilo Senior): primeiro o email; o servidor diz se a
- * pessoa entra com a senha atual ou se precisa criar uma nova (redefinição
- * liberada pelo admin).
+ * pessoa entra com a senha atual, se precisa criar uma nova (redefinição
+ * liberada pelo admin) ou se o email nem está cadastrado.
  */
 type Step = "email" | "password" | "new-password";
 
@@ -69,10 +69,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await checkPasswordReset(email);
-      // Email desconhecido também segue para a senha (e falha lá), para não
-      // revelar quem tem conta no portal.
-      goTo(result.allowed ? "new-password" : "password");
+      const result = await checkLoginEmail(email);
+      if (result.error || !result.next) {
+        setError(result.error ?? "Não foi possível verificar o email. Tente de novo.");
+        return;
+      }
+      goTo(result.next);
     });
   }
 

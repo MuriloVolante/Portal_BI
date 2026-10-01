@@ -4,22 +4,44 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { demoFindUserByEmail, demoResetUntil, demoSetResetWindow, isDemoMode } from "@/lib/demo";
 import { findAuthUserByEmail, getResetUntil, isBannedUser } from "@/lib/auth/passwordReset";
 
-// Ações públicas (sem sessão) do "Esqueceu a senha?". A resposta é a mesma
-// para email inexistente e para email sem liberação, para não revelar quem
-// tem conta no portal.
+// Ações públicas (sem sessão) do login em etapas.
 
 const NOT_ALLOWED =
   "A redefinição de senha não está liberada para este email. Peça ao administrador do portal para liberar.";
+const UNKNOWN_EMAIL = "Este email não está cadastrado no portal. Confira o endereço ou fale com o administrador.";
+const BLOCKED = "Este acesso está desativado. Fale com o administrador do portal.";
+const UNAVAILABLE = "Não foi possível verificar o email agora. Tente de novo em instantes.";
 
-export async function checkPasswordReset(email: string): Promise<{ allowed: boolean; error?: string }> {
+async function lookupUser(email: string) {
+  try {
+    return { user: await findAuthUserByEmail(email) };
+  } catch (err) {
+    console.error("[login] busca de usuário falhou:", err);
+    return { failed: true as const, user: null };
+  }
+}
+
+export type LoginEmailStep = "password" | "new-password";
+
+/**
+ * Primeira etapa do login: diz se o email entra com a senha atual ou se
+ * precisa criar uma nova. Email não cadastrado ou desativado para aqui
+ * mesmo (decisão consciente: o portal é interno e isso evita a pessoa
+ * digitar uma senha que nunca vai funcionar).
+ */
+export async function checkLoginEmail(email: string): Promise<{ next?: LoginEmailStep; error?: string }> {
   if (isDemoMode) {
     const user = demoFindUserByEmail(email);
-    return user && demoResetUntil(user.id) ? { allowed: true } : { allowed: false, error: NOT_ALLOWED };
+    if (!user) return { error: UNKNOWN_EMAIL };
+    if (user.banned) return { error: BLOCKED };
+    return { next: demoResetUntil(user.id) ? "new-password" : "password" };
   }
 
-  const user = await findAuthUserByEmail(email);
-  if (!user || isBannedUser(user as { banned_until?: string })) return { allowed: false, error: NOT_ALLOWED };
-  return (await getResetUntil(user.id)) ? { allowed: true } : { allowed: false, error: NOT_ALLOWED };
+  const { user, failed } = await lookupUser(email);
+  if (failed) return { error: UNAVAILABLE };
+  if (!user) return { error: UNKNOWN_EMAIL };
+  if (isBannedUser(user as { banned_until?: string })) return { error: BLOCKED };
+  return { next: (await getResetUntil(user.id)) ? "new-password" : "password" };
 }
 
 export async function resetPasswordWithWindow(
@@ -36,7 +58,8 @@ export async function resetPasswordWithWindow(
   }
 
   // Revalida tudo no servidor: a tela nunca decide sozinha.
-  const user = await findAuthUserByEmail(email);
+  const { user, failed } = await lookupUser(email);
+  if (failed) return { error: UNAVAILABLE };
   if (!user || isBannedUser(user as { banned_until?: string }) || !(await getResetUntil(user.id))) {
     return { error: NOT_ALLOWED };
   }

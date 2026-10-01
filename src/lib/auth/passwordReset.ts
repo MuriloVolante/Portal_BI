@@ -3,14 +3,17 @@ import { createAdminClient } from "@/lib/supabase/server";
 /** Tempo que uma liberação de redefinição fica valendo. */
 export const RESET_WINDOW_MS = 24 * 3_600_000;
 
-/** Busca o usuário do Auth pelo email (service role). */
+/**
+ * Busca o usuário do Auth pelo email (service role). Lança erro se o
+ * Supabase falhar, para não confundir falha com "email não cadastrado".
+ */
 export async function findAuthUserByEmail(email: string) {
   const target = email.trim().toLowerCase();
   if (!target) return null;
   const admin = createAdminClient();
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) return null;
+    if (error) throw new Error(`listUsers falhou: ${error.message}`);
     const users = data?.users ?? [];
     const found = users.find((u) => u.email?.toLowerCase() === target);
     if (found) return found;
