@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEMO_PASSWORD,
@@ -16,17 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Mode = "login" | "reset-email" | "reset-password";
+/**
+ * Login em etapas (estilo Senior): primeiro o email; o servidor diz se a
+ * pessoa entra com a senha atual ou se precisa criar uma nova (redefinição
+ * liberada pelo admin).
+ */
+type Step = "email" | "password" | "new-password";
 
-const HEADINGS: Record<Mode, string> = {
-  login: "Acesse a sua conta",
-  "reset-email": "Redefinir senha",
-  "reset-password": "Defina sua nova senha",
+const HEADINGS: Record<Step, string> = {
+  email: "Acesse a sua conta",
+  password: "Acesse a sua conta",
+  "new-password": "Crie sua nova senha",
 };
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("login");
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -35,64 +40,54 @@ export default function LoginPage() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const busy = loading || pending;
 
-  function goTo(next: Mode) {
+  function goTo(next: Step) {
     setError(null);
     setInfo(null);
+    setPassword("");
     setNewPassword("");
     setConfirm("");
-    setMode(next);
+    setStep(next);
   }
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    setLoading(true);
-
+  async function signIn(pass: string): Promise<boolean> {
     if (isDemoMode) {
       const demoUser = demoFindUserByEmail(email);
-      if (!demoUser || password !== DEMO_PASSWORD) {
-        setError("Email ou senha inválidos.");
-        setLoading(false);
-        return;
-      }
+      if (!demoUser || pass !== DEMO_PASSWORD) return false;
       document.cookie = `${DEMO_SESSION_COOKIE}=${demoUser.id}; path=/`;
-      router.push("/");
-      router.refresh();
-      return;
+    } else {
+      const { error } = await createClient().auth.signInWithPassword({ email, password: pass });
+      if (error) return false;
     }
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError("Email ou senha inválidos.");
-      setLoading(false);
-      return;
-    }
-
     router.push("/");
     router.refresh();
+    return true;
   }
 
-  function handleCheckEmail(e: React.FormEvent) {
+  function handleEmail(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
       const result = await checkPasswordReset(email);
-      if (!result.allowed) {
-        setError(result.error ?? null);
-        return;
-      }
-      goTo("reset-password");
+      // Email desconhecido também segue para a senha (e falha lá), para não
+      // revelar quem tem conta no portal.
+      goTo(result.allowed ? "new-password" : "password");
     });
   }
 
-  function handleSaveNewPassword(e: React.FormEvent) {
+  async function handlePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    if (!(await signIn(password))) {
+      setError("Email ou senha inválidos.");
+      setLoading(false);
+    }
+  }
+
+  function handleNewPassword(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (newPassword.length < 6) {
@@ -109,13 +104,14 @@ export default function LoginPage() {
         setError(result.error);
         return;
       }
-      goTo("login");
-      setPassword("");
-      setInfo(
-        result.demo
-          ? "Modo demo: fluxo concluído (a senha demo não muda). Entre com demo123."
-          : "Senha alterada. Entre com a nova senha."
-      );
+      setLoading(true);
+      // No demo a senha não muda de verdade: entra com a senha demo.
+      const ok = await signIn(result.demo ? DEMO_PASSWORD : newPassword);
+      if (!ok) {
+        setLoading(false);
+        goTo("password");
+        setInfo("Senha criada. Entre com a nova senha.");
+      }
     });
   }
 
@@ -134,34 +130,50 @@ export default function LoginPage() {
     </>
   );
 
-  const backToLogin = (
-    <button
-      type="button"
-      onClick={() => goTo("login")}
-      disabled={pending}
-      className="mx-auto flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-    >
-      <ArrowLeft className="h-3.5 w-3.5" />
-      Voltar ao login
-    </button>
+  const emailChip = (
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 px-3 py-2.5">
+      <span className="truncate text-sm">{email}</span>
+      <button
+        type="button"
+        onClick={() => goTo("email")}
+        disabled={busy}
+        className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        Trocar
+      </button>
+    </div>
   );
 
   return (
-    <AuthShell heading={HEADINGS[mode]}>
-      {mode === "login" && (
-        <form key="login" onSubmit={handleLogin} className="animate-rise-in space-y-5">
+    <AuthShell heading={HEADINGS[step]}>
+      {step === "email" && (
+        <form key="email" onSubmit={handleEmail} className="animate-rise-in space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              autoComplete="email"
-              placeholder="voce@empresa.com"
+              autoComplete="username"
+              placeholder="usuario@empresa.com.br"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoFocus
               required
             />
           </div>
+          {feedback}
+          <Button type="submit" size="lg" className="w-full" disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : null}
+            Próximo
+            {!busy && <ArrowRight />}
+          </Button>
+        </form>
+      )}
+
+      {step === "password" && (
+        <form key="password" onSubmit={handlePassword} className="animate-rise-in space-y-5">
+          {emailChip}
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
             <Input
@@ -171,62 +183,36 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoFocus
               required
             />
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => goTo("reset-email")}
-                disabled={loading}
+                onClick={() => {
+                  setError(null);
+                  setInfo("Peça ao administrador do portal para liberar a redefinição. Depois, entre de novo com seu email.");
+                }}
+                disabled={busy}
                 className="text-[12px] text-tertiary underline-offset-4 transition-colors hover:text-muted-foreground hover:underline disabled:opacity-50"
               >
                 Esqueceu a senha?
               </button>
             </div>
           </div>
-
           {feedback}
-
-          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          <Button type="submit" size="lg" className="w-full" disabled={busy}>
             {loading && <Loader2 className="animate-spin" />}
             Entrar
           </Button>
         </form>
       )}
 
-      {mode === "reset-email" && (
-        <form key="reset-email" onSubmit={handleCheckEmail} className="animate-rise-in space-y-5">
-          <p className="text-center text-sm text-muted-foreground">
-            Informe seu email. Se o administrador liberou a redefinição para você, já dá para criar a nova senha.
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="reset-email">Email</Label>
-            <Input
-              id="reset-email"
-              type="email"
-              autoComplete="email"
-              placeholder="voce@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-              required
-            />
-          </div>
-
-          {feedback}
-
-          <Button type="submit" size="lg" className="w-full" disabled={pending}>
-            {pending && <Loader2 className="animate-spin" />}
-            Continuar
-          </Button>
-          {backToLogin}
-        </form>
-      )}
-
-      {mode === "reset-password" && (
-        <form key="reset-password" onSubmit={handleSaveNewPassword} className="animate-rise-in space-y-5">
-          <p className="text-center text-sm text-muted-foreground">
-            Nova senha para <span className="text-foreground">{email}</span>
+      {step === "new-password" && (
+        <form key="new-password" onSubmit={handleNewPassword} className="animate-rise-in space-y-5">
+          {emailChip}
+          <p className="text-sm text-muted-foreground">
+            Sua senha foi redefinida. Crie uma nova para continuar.
           </p>
           <div className="space-y-2">
             <Label htmlFor="new-password">Nova senha</Label>
@@ -252,29 +238,23 @@ export default function LoginPage() {
               required
             />
           </div>
-
           {feedback}
-
-          <Button type="submit" size="lg" className="w-full" disabled={pending}>
-            {pending && <Loader2 className="animate-spin" />}
-            Salvar nova senha
+          <Button type="submit" size="lg" className="w-full" disabled={busy}>
+            {busy && <Loader2 className="animate-spin" />}
+            Salvar e entrar
           </Button>
-          {backToLogin}
         </form>
       )}
 
-      {isDemoMode && mode === "login" && (
+      {isDemoMode && step === "email" && (
         <div className="mt-6 rounded-xl border border-primary/30 bg-primary/[.08] p-3.5 text-xs text-muted-foreground">
           <p className="mb-1 font-semibold text-primary">Modo demo ativo</p>
           <p>
-            admin: <span className="font-mono text-foreground">admin@demo.com</span>
+            admin: <span className="font-mono text-foreground">admin@demo.com</span> (senha{" "}
+            <span className="font-mono text-foreground">demo123</span>)
             <br />
-            usuário: <span className="font-mono text-foreground">user@demo.com</span>
-            <br />
-            senha: <span className="font-mono text-foreground">demo123</span>
-          </p>
-          <p className="mt-2">
-            “Esqueceu a senha?” já vem liberado para <span className="font-mono text-foreground">user@demo.com</span>.
+            <span className="font-mono text-foreground">user@demo.com</span> está com a senha redefinida: vai pedir uma
+            nova.
           </p>
         </div>
       )}

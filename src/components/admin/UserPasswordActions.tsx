@@ -38,7 +38,7 @@ export function UserPasswordActions({ userId, resetUntil }: UserPasswordActionsP
       <div className="space-y-2">
         <Label>Redefinição pelo login</Label>
         <p className="text-xs text-muted-foreground">
-          O usuário define a nova senha em “Esqueceu a senha?”. Vale por 24h e uma única vez.
+          No próximo login, ao informar o email, o usuário cria uma nova senha. Vale por 24h e uma única vez.
         </p>
         <ResetWindowControl userId={userId} initialUntil={resetUntil} />
       </div>

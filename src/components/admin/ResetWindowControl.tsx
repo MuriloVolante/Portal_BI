@@ -31,7 +31,7 @@ export function ResetWindowControl({ userId, initialUntil }: ResetWindowControlP
         return;
       }
       setUntil(result.until ?? null);
-      setMessage(enabled ? "Liberado. Avise o usuário para usar “Esqueceu a senha?” no login." : "Liberação cancelada.");
+      setMessage(enabled ? "Liberado. No próximo login ele vai criar uma nova senha." : "Liberação cancelada.");
     });
   }
 
