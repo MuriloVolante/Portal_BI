@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell title="Redefinir senha" subtitle="Defina sua nova senha de acesso.">
+    <AuthShell heading="Defina sua nova senha">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="password">Nova senha</Label>

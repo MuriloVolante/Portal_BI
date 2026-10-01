@@ -1,54 +1,53 @@
-import { MeshCanvas } from "@/components/brand/MeshCanvas";
+import { MeshField } from "@/components/brand/MeshField";
 import { MeshMark } from "@/components/brand/MeshMark";
 import { APP_VERSION } from "@/lib/version";
 
 interface AuthShellProps {
-  title: string;
-  subtitle: string;
+  /** Frase sob a marca (ex.: "Acesse a sua conta"). */
+  heading: string;
   children: React.ReactNode;
 }
 
-/** Tela dividida: arte da malha à esquerda (desktop) e formulário à direita. */
-export function AuthShell({ title, subtitle, children }: AuthShellProps) {
+/** Tela dividida: malha orgânica à esquerda (desktop) e formulário à direita. */
+export function AuthShell({ heading, children }: AuthShellProps) {
   return (
-    <div className="grid min-h-[100dvh] bg-background lg:grid-cols-[1.1fr_1fr]">
+    <div className="grid min-h-[100dvh] bg-background lg:grid-cols-[1.15fr_1fr]">
       <section className="relative hidden overflow-hidden border-r bg-sidebar lg:block">
-        <div className="absolute inset-0 bg-[radial-gradient(60%_55%_at_50%_45%,rgb(150_215_55/.08),transparent_70%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_50%_at_50%_42%,rgb(150_215_55/.07),transparent_70%)]" />
         <div className="absolute inset-0">
-          <MeshCanvas />
+          <MeshField centerY={0.4} spread={0.37} />
         </div>
-        <div className="pointer-events-none absolute left-10 top-9 flex items-center gap-2.5">
-          <MeshMark size={30} />
-          <span className="font-display text-[15.5px] font-semibold tracking-[-0.02em]">
-            Portal <span className="text-primary">BI</span>
-          </span>
-        </div>
-        <div className="pointer-events-none absolute bottom-10 left-10 right-10">
-          <p className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em]">
-            Seus painéis,
-            <br />
-            num só lugar.
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-sidebar via-sidebar/80 to-transparent" />
+        <div className="pointer-events-none absolute bottom-12 left-12 right-12">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[.2em] text-primary">
+            Recursos Humanos · Viação Garcia
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">Viação Garcia · indicadores em Power BI</p>
+          <p className="font-display text-[40px] font-semibold leading-[1.08] tracking-[-0.03em] xl:text-[46px]">
+            Indicadores de RH
+            <br />
+            que movem <span className="text-primary">decisões.</span>
+          </p>
+          <p className="mt-4 text-[15px] text-muted-foreground">Dashboards executivos em Power BI.</p>
         </div>
       </section>
 
       <section className="flex flex-col">
-        <div className="relative h-[190px] shrink-0 overflow-hidden border-b bg-sidebar lg:hidden">
-          <MeshCanvas />
-          <div className="pointer-events-none absolute left-5 top-5 flex items-center gap-2">
-            <MeshMark size={26} />
-            <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">
-              Portal <span className="text-primary">BI</span>
-            </span>
-          </div>
+        <div className="relative h-[150px] shrink-0 overflow-hidden border-b bg-sidebar lg:hidden">
+          <MeshField />
         </div>
 
         <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
-          <div className="w-full max-w-[380px] animate-view-in">
-            <h1 className="text-[26px] font-semibold leading-tight">{title}</h1>
-            <p className="mt-1.5 text-[15px] text-muted-foreground">{subtitle}</p>
-            <div className="mt-8">{children}</div>
+          <div className="w-full max-w-[360px] animate-view-in">
+            <div className="mb-9 flex flex-col items-center text-center">
+              <div className="flex items-center gap-3">
+                <MeshMark size={46} />
+                <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.03em]">
+                  Portal <span className="text-primary">BI</span>
+                </span>
+              </div>
+              <p className="mt-6 text-[17px] text-foreground/90">{heading}</p>
+            </div>
+            {children}
           </div>
         </div>
 

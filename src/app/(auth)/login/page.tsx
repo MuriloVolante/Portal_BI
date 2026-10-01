@@ -86,7 +86,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell title="Entrar" subtitle="Acesse seus dashboards Power BI.">
+    <AuthShell heading="Acesse a sua conta">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -101,17 +101,7 @@ export default function LoginPage() {
           />
         </div>
         <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="password">Senha</Label>
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={loading}
-              className="text-[13px] font-medium text-primary transition-colors hover:text-primary-hover disabled:opacity-50"
-            >
-              Esqueci minha senha
-            </button>
-          </div>
+          <Label htmlFor="password">Senha</Label>
           <Input
             id="password"
             type="password"
@@ -121,6 +111,17 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {/* Discreto de propósito: o Supabase limita o envio desse email. */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={loading}
+              className="text-[12px] text-tertiary underline-offset-4 transition-colors hover:text-muted-foreground hover:underline disabled:opacity-50"
+            >
+              Esqueceu a senha?
+            </button>
+          </div>
         </div>
 
         {error && (

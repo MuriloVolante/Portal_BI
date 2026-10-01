@@ -25,7 +25,10 @@ export const metadata: Metadata = {
     // por baixo da barra de status do iPhone e cobriria o conteúdo do topo.
     statusBarStyle: "black",
   },
+  // Declarar `icons` aqui desliga a detecção automática do app/icon.svg,
+  // então o favicon precisa estar listado junto.
   icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: "/apple-touch-icon.png",
   },
 };
