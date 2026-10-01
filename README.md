@@ -4,7 +4,7 @@ Portal de dashboards Power BI com controle de acesso por usuário, construído c
 
 ## Funcionalidades
 
-- 🔐 Login com email/senha via Supabase Auth + "Esqueci minha senha"
+- 🔐 Login com email/senha via Supabase Auth + "Esqueceu a senha?" liberado pelo admin (24h, uso único, sem email)
 - 📊 Dashboards Power BI embutidos por iframe, com rodapé escondido por crop visual
 - 🧭 Sidebar dinâmica: cada usuário enxerga apenas as páginas liberadas
 - 🛡️ A URL de embed vive apenas no banco e é entregue pelo servidor (`/api/embed-url`) após validar sessão e permissão — nunca fica no frontend
@@ -42,7 +42,7 @@ O modo demo usa dados em memória (3 páginas de exemplo apontando para o relat�
 3. Em **Authentication → Sign In / Providers**, confirme que **Email** está habilitado. Se não quiser cadastro aberto, desative *Allow new users to sign up* — o admin cria os usuários pelo painel.
 4. Em **Authentication → URL Configuration**:
    - **Site URL**: a URL do app na Vercel (ex.: `https://seu-portal.vercel.app`)
-   - **Redirect URLs**: adicione `https://seu-portal.vercel.app/reset-password` e, para dev, `http://localhost:3000/reset-password`
+   - A redefinição de senha **não usa email**: o admin libera o usuário em Usuários → Senha, e ele cria a nova senha em "Esqueceu a senha?" no login.
 5. Copie as credenciais em **Settings → API**:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -72,7 +72,7 @@ where id = (select id from auth.users where email = 'seu-email@empresa.com');
 | `SUPABASE_SERVICE_ROLE_KEY` | chave `service_role` |
 
 4. Clique em **Deploy**.
-5. Com a URL final em mãos, volte ao Supabase e ajuste **Site URL** / **Redirect URLs** (passo 4 acima) se ainda apontam para outro endereço.
+5. Com a URL final em mãos, volte ao Supabase e ajuste a **Site URL** (passo 4 acima) se ainda aponta para outro endereço.
 
 Pronto: faça login com o admin e cadastre os dashboards em **Administração → Páginas** (cole a URL "Publicar na web" do Power BI no campo de embed).
 

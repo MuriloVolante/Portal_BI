@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 const LIME = [150, 215, 55];
 const CYAN = [35, 150, 180];
+/** Faixas de cor (ciano → lima) com o brilho pré-renderizado. */
+const HALO_STEPS = 6;
 
 interface Node {
   /** Posição relativa ao centro, em fração do raio (sobrevive a resize). */
@@ -15,12 +17,30 @@ interface Node {
   /** Profundidade 0 (fundo) a 1 (frente): tamanho, brilho e cor. */
   z: number;
   seed: number;
-  hub: boolean;
 }
 
+function mixColor(t: number) {
+  return LIME.map((v, i) => Math.round(CYAN[i] + (v - CYAN[i]) * t));
+}
 function rgba(t: number, a: number) {
-  const c = LIME.map((v, i) => Math.round(CYAN[i] + (v - CYAN[i]) * t));
+  const c = mixColor(t);
   return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+/** Brilho radial desenhado uma vez por faixa de cor e reaproveitado. */
+function makeHalos(): HTMLCanvasElement[] {
+  return Array.from({ length: HALO_STEPS }, (_, i) => {
+    const t = i / (HALO_STEPS - 1);
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d")!;
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, rgba(t, 1));
+    grad.addColorStop(1, rgba(t, 0));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return c;
+  });
 }
 
 /** Campo de fluxo suave: soma de senoides, muda devagar no tempo. */
@@ -41,11 +61,10 @@ interface MeshFieldProps {
 }
 
 /**
- * Malha orgânica: nós à deriva num campo de fluxo formam uma nuvem
- * irregular, com ligações que nascem e somem pela distância. O ponteiro
- * arrasta e gira o fluxo; o impulso se dissipa devagar, então a forma muda
- * de verdade em vez de só voltar. Pausa fora da tela e respeita "reduzir
- * movimento" (quadro estático).
+ * Malha orgânica: poucos nós à deriva num campo de fluxo, com distância
+ * mínima entre eles (nunca se amontoam) e ligações que nascem e somem pela
+ * proximidade. O ponteiro arrasta e gira o fluxo; o impulso se dissipa
+ * devagar. Pausa fora da tela e respeita "reduzir movimento".
  */
 export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshFieldProps) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -56,10 +75,16 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
     if (!canvas || !ctx) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const halos = makeHalos();
     let width = 0;
     let height = 0;
     let radius = 1;
     let nodes: Node[] = [];
+    let sx = new Float32Array(0);
+    let sy = new Float32Array(0);
+    // Distância mínima entre nós (fração do raio), calculada pela área da
+    // nuvem dividida pela quantidade de nós: sempre cabe sem tremer.
+    let separation = 0.3;
     let time = Math.random() * 100;
     let last = 0;
     let raf = 0;
@@ -67,25 +92,20 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, active: 0, inside: false, lastT: 0 };
 
     function seedNodes() {
-      const count = Math.max(34, Math.min(105, Math.round((width * height) / 10500)));
-      nodes = Array.from({ length: count }, (_, i) => {
+      const count = Math.max(22, Math.min(38, Math.round((width * height) / 24000)));
+      nodes = Array.from({ length: count }, () => {
         const a = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(Math.random()) * 0.95;
-        return {
-          x: Math.cos(a) * r,
-          y: Math.sin(a) * r * 0.9,
-          vx: 0,
-          vy: 0,
-          z: Math.random(),
-          seed: Math.random() * 10,
-          hub: i < 3,
-        };
+        const r = Math.sqrt(Math.random()) * 0.92;
+        return { x: Math.cos(a) * r, y: Math.sin(a) * r * 0.9, vx: 0, vy: 0, z: Math.random(), seed: Math.random() * 10 };
       });
+      separation = Math.sqrt(2.4 / count) * 0.9;
+      sx = new Float32Array(count);
+      sy = new Float32Array(count);
     }
 
     function resize() {
       const rect = canvas!.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
       const first = width === 0;
       width = rect.width;
       height = rect.height;
@@ -104,6 +124,25 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
       pointer.vy *= Math.pow(0.82, k);
       pointer.active += ((pointer.inside ? 1 : 0) - pointer.active) * Math.min(1, 0.08 * k);
 
+      // separação: nós perto demais se empurram, então a malha nunca vira um bolo
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const d = Math.hypot(dx, dy);
+          if (d >= separation || d < 1e-6) continue;
+          const push = (1 - d / separation) * 0.0009 * k;
+          const ux = dx / d;
+          const uy = dy / d;
+          a.vx += ux * push;
+          a.vy += uy * push;
+          b.vx -= ux * push;
+          b.vy -= uy * push;
+        }
+      }
+
       const cx = width / 2;
       const cy = height * centerY;
       const influence = Math.min(width, height) * 0.32;
@@ -114,8 +153,7 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
         n.vx += Math.cos(ang) * 0.000025 * k;
         n.vy += Math.sin(ang) * 0.000025 * k;
 
-        // coesão bem fraca: depois de uma perturbação a nuvem se reorganiza
-        // aos poucos, sem voltar de uma vez para a forma anterior
+        // coesão fraca: depois de uma perturbação a nuvem se reorganiza aos poucos
         n.vx -= n.x * 0.000012 * k;
         n.vy -= n.y * 0.000012 * k;
 
@@ -128,18 +166,16 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
           n.vy -= (n.y / dist) * pull;
         }
 
-        // ponteiro: arrasta junto, gira em volta e abre caminho
+        // ponteiro: arrasta junto e gira em volta
         if (pointer.active > 0.01) {
-          const px = cx + n.x * radius;
-          const py = cy + n.y * radius;
-          const dx = px - pointer.x;
-          const dy = py - pointer.y;
+          const dx = cx + n.x * radius - pointer.x;
+          const dy = cy + n.y * radius - pointer.y;
           const d = Math.hypot(dx, dy);
           if (d < influence && d > 0.5) {
             const f = (1 - d / influence) * pointer.active;
             const ux = dx / d;
             const uy = dy / d;
-            n.vx += ((pointer.vx * 0.05 + -uy * 0.9 + ux * 0.18) * f * k) / radius;
+            n.vx += ((pointer.vx * 0.05 - uy * 0.9 + ux * 0.18) * f * k) / radius;
             n.vy += ((pointer.vy * 0.05 + ux * 0.9 + uy * 0.18) * f * k) / radius;
           }
         }
@@ -149,10 +185,9 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
         n.vx *= drag;
         n.vy *= drag;
         const speed = Math.hypot(n.vx, n.vy);
-        const max = 0.012;
-        if (speed > max) {
-          n.vx = (n.vx / speed) * max;
-          n.vy = (n.vy / speed) * max;
+        if (speed > 0.012) {
+          n.vx = (n.vx / speed) * 0.012;
+          n.vy = (n.vy / speed) * 0.012;
         }
         n.x += n.vx * k;
         n.y += n.vy * k;
@@ -163,65 +198,62 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
     function draw() {
       const cx = width / 2;
       const cy = height * centerY;
-      const link = Math.max(70, Math.min(150, Math.min(width, height) * 0.2));
-      const pts = nodes.map((n) => ({ ...n, sx: cx + n.x * radius, sy: cy + n.y * radius }));
+      const link = radius * 0.62;
+      const link2 = link * link;
+      const count = nodes.length;
+      for (let i = 0; i < count; i++) {
+        sx[i] = cx + nodes[i].x * radius;
+        sy[i] = cy + nodes[i].y * radius;
+      }
 
       ctx!.clearRect(0, 0, width, height);
       ctx!.lineCap = "round";
 
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        for (let j = i + 1; j < pts.length; j++) {
-          const b = pts[j];
-          const dx = a.sx - b.sx;
-          const dy = a.sy - b.sy;
+      for (let i = 0; i < count; i++) {
+        for (let j = i + 1; j < count; j++) {
+          const dx = sx[i] - sx[j];
+          const dy = sy[i] - sy[j];
           const d2 = dx * dx + dy * dy;
-          if (d2 > link * link) continue;
+          if (d2 > link2) continue;
           const closeness = 1 - Math.sqrt(d2) / link;
-          const depth = (a.z + b.z) / 2;
-          ctx!.strokeStyle = rgba(depth, Math.pow(closeness, 1.3) * (0.18 + 0.5 * depth));
-          ctx!.lineWidth = 0.5 + closeness * (0.6 + depth * 0.9);
+          const depth = (nodes[i].z + nodes[j].z) / 2;
+          ctx!.strokeStyle = rgba(depth, Math.pow(closeness, 1.2) * (0.22 + 0.5 * depth));
+          ctx!.lineWidth = 0.6 + closeness * (0.6 + depth * 0.9);
           ctx!.beginPath();
-          ctx!.moveTo(a.sx, a.sy);
-          ctx!.lineTo(b.sx, b.sy);
+          ctx!.moveTo(sx[i], sy[i]);
+          ctx!.lineTo(sx[j], sy[j]);
           ctx!.stroke();
         }
       }
 
       // fios até o ponteiro enquanto ele está sobre a malha
       if (pointer.active > 0.02) {
-        const reach = link * 1.15;
-        for (const p of pts) {
-          const d = Math.hypot(p.sx - pointer.x, p.sy - pointer.y);
+        const reach = link * 1.1;
+        ctx!.lineWidth = 0.8;
+        for (let i = 0; i < count; i++) {
+          const d = Math.hypot(sx[i] - pointer.x, sy[i] - pointer.y);
           if (d > reach) continue;
           ctx!.strokeStyle = rgba(1, (1 - d / reach) * 0.45 * pointer.active);
-          ctx!.lineWidth = 0.8;
           ctx!.beginPath();
-          ctx!.moveTo(p.sx, p.sy);
+          ctx!.moveTo(sx[i], sy[i]);
           ctx!.lineTo(pointer.x, pointer.y);
           ctx!.stroke();
         }
       }
 
-      for (const p of pts.sort((a, b) => a.z - b.z)) {
-        const r = p.hub ? 3.6 + p.z * 1.6 : 1 + p.z * 2.1;
-        const halo = ctx!.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r * 5);
-        halo.addColorStop(0, rgba(p.z, 0.16 + 0.22 * p.z + 0.15 * pointer.active));
-        halo.addColorStop(1, rgba(p.z, 0));
-        ctx!.fillStyle = halo;
+      // nós: todos com o mesmo estilo, variando só com a profundidade
+      for (let i = 0; i < count; i++) {
+        const z = nodes[i].z;
+        const r = 1.4 + z * 2;
+        const halo = halos[Math.round(z * (HALO_STEPS - 1))];
+        const hr = r * 5;
+        ctx!.globalAlpha = 0.14 + 0.2 * z + 0.12 * pointer.active;
+        ctx!.drawImage(halo, sx[i] - hr, sy[i] - hr, hr * 2, hr * 2);
+        ctx!.globalAlpha = 1;
+        ctx!.fillStyle = rgba(z, 0.5 + 0.5 * z);
         ctx!.beginPath();
-        ctx!.arc(p.sx, p.sy, r * 5, 0, Math.PI * 2);
+        ctx!.arc(sx[i], sy[i], r, 0, Math.PI * 2);
         ctx!.fill();
-
-        ctx!.fillStyle = rgba(p.z, 0.45 + 0.55 * p.z);
-        ctx!.beginPath();
-        ctx!.arc(p.sx, p.sy, r, 0, Math.PI * 2);
-        ctx!.fill();
-        if (p.hub) {
-          ctx!.strokeStyle = "rgba(38,38,38,0.9)";
-          ctx!.lineWidth = 1.4;
-          ctx!.stroke();
-        }
       }
     }
 
@@ -243,8 +275,8 @@ export function MeshField({ className, centerY = 0.5, spread = 0.44 }: MeshField
     }
 
     resize();
-    // Alguns passos antes do primeiro quadro: a nuvem já nasce "assentada".
-    for (let i = 0; i < 90; i++) step(1 / 60);
+    // Passos antes do primeiro quadro: a nuvem já nasce espaçada e "assentada".
+    for (let i = 0; i < 180; i++) step(1 / 60);
     draw();
 
     const ro = new ResizeObserver(() => {

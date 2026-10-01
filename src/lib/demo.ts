@@ -77,6 +77,8 @@ interface DemoStore {
   pages: DemoPage[];
   /** chaves "userId:pageId" */
   permissions: Set<string>;
+  /** userId → fim da liberação de redefinição de senha (ms). */
+  resetWindows: Map<string, number>;
 }
 
 function createInitialStore(): DemoStore {
@@ -124,6 +126,9 @@ function createInitialStore(): DemoStore {
       `${juliana.id}:${pages[1].id}`,
       `${rafael.id}:${pages[2].id}`,
     ]),
+    // A usuária demo já começa com a redefinição liberada, para dar para
+    // testar o fluxo do "Esqueceu a senha?" no Preview.
+    resetWindows: new Map([[user.id, Date.now() + 24 * 3_600_000]]),
   };
 }
 
@@ -290,4 +295,16 @@ export function demoAccessLogs(): DemoAccessLog[] {
 
 export function demoLastSeen(userId: string): string | null {
   return demoAccessLogs().find((l) => l.user_id === userId)?.created_at ?? null;
+}
+
+// ---------- Redefinição de senha liberada pelo admin ----------
+
+export function demoResetUntil(userId: string): string | null {
+  const until = demoStore().resetWindows.get(userId);
+  return until && until > Date.now() ? new Date(until).toISOString() : null;
+}
+
+export function demoSetResetWindow(userId: string, until: number | null) {
+  if (until) demoStore().resetWindows.set(userId, until);
+  else demoStore().resetWindows.delete(userId);
 }

@@ -1,16 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { getSessionInfo } from "@/lib/auth/session";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import {
   demoCreatePage,
   demoDeletePage,
+  demoSetResetWindow,
   demoTogglePermission,
   demoUpdatePage,
   isDemoMode,
 } from "@/lib/demo";
+import { RESET_WINDOW_MS } from "@/lib/auth/passwordReset";
 import type { Role } from "@/types";
 
 interface ActionResult {
@@ -213,21 +214,30 @@ export async function toggleUserPage(
   return {};
 }
 
-export async function sendPasswordReset(email: string): Promise<ActionResult> {
+/**
+ * Libera (ou cancela) a redefinição de senha pela tela de login. Vale por
+ * 24h e é de uso único: some assim que o usuário troca a senha.
+ */
+export async function setPasswordResetWindow(
+  userId: string,
+  enabled: boolean
+): Promise<ActionResult & { until?: string | null }> {
   await assertAdmin();
+  const until = enabled ? new Date(Date.now() + RESET_WINDOW_MS) : null;
 
   if (isDemoMode) {
-    return { error: "Modo demo: redefinição de senha requer o Supabase configurado." };
+    demoSetResetWindow(userId, until ? until.getTime() : null);
+  } else {
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("profiles")
+      .update({ password_reset_until: until ? until.toISOString() : null })
+      .eq("id", userId);
+    if (error) return { error: "Não foi possível atualizar a liberação de senha." };
   }
 
-  const origin = headers().get("origin") ?? "";
-  const supabase = createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/reset-password`,
-  });
-
-  if (error) return { error: "Não foi possível enviar o email de redefinição." };
-  return {};
+  revalidatePath(`/admin/usuarios/${userId}`);
+  return { until: until ? until.toISOString() : null };
 }
 
 // ---------- CRUD de páginas ----------

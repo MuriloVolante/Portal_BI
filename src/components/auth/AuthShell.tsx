@@ -19,9 +19,6 @@ export function AuthShell({ heading, children }: AuthShellProps) {
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-sidebar via-sidebar/80 to-transparent" />
         <div className="pointer-events-none absolute bottom-12 left-12 right-12">
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[.2em] text-primary">
-            Recursos Humanos · Viação Garcia
-          </p>
           <p className="font-display text-[40px] font-semibold leading-[1.08] tracking-[-0.03em] xl:text-[46px]">
             Indicadores de RH
             <br />

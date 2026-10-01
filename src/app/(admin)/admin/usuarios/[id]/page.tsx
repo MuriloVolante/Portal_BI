@@ -8,8 +8,10 @@ import {
   demoGetUser,
   demoHasPermission,
   demoListPages,
+  demoResetUntil,
   isDemoMode,
 } from "@/lib/demo";
+import { getResetUntil } from "@/lib/auth/passwordReset";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +43,7 @@ interface UserDetails {
   allowedPageIds: Set<string>;
   banned: boolean;
   activity: ActivityEntry[];
+  resetUntil: string | null;
 }
 
 /** banned_until vem do Supabase Auth; no passado ou ausente = ativo. */
@@ -68,6 +71,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
         .filter((l) => l.user_id === id)
         .slice(0, 15)
         .map((l) => ({ ...l, icon: iconByPageId.get(l.page_id) })),
+      resetUntil: demoResetUntil(id),
     };
   }
 
@@ -76,7 +80,9 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
   if (error || !userData?.user) return null;
   const user = userData.user;
 
-  const [{ data: profile }, { data: pages }, { data: userPages }, { data: logs }] =
+  // A liberação de senha vem numa consulta separada: se a migration 0003
+  // ainda não rodou, só esse recurso fica indisponível (o resto da página não).
+  const [{ data: profile }, { data: pages }, { data: userPages }, { data: logs }, resetUntil] =
     await Promise.all([
       admin
         .from("profiles")
@@ -94,6 +100,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(15),
+      getResetUntil(user.id),
     ]);
 
   const allPages = (pages ?? []) as unknown as SidebarPage[];
@@ -111,6 +118,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
       icon: log.page_id ? iconByPageId.get(log.page_id) : null,
       created_at: log.created_at,
     })),
+    resetUntil,
   };
 }
 
@@ -119,7 +127,7 @@ const stagger = (i: number) => ({ "--i": i }) as React.CSSProperties;
 export default async function UserEditPage({ params }: UserEditPageProps) {
   const details = await getUserDetails(params.id);
   if (!details) notFound();
-  const { user, profile, allPages, allowedPageIds, banned, activity } = details;
+  const { user, profile, allPages, allowedPageIds, banned, activity, resetUntil } = details;
 
   const session = await getSessionInfo();
   const isSelf = session?.user.id === user.id;
@@ -160,7 +168,7 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
             />
             <div className="border-t pt-5">
               <p className="mb-4 font-display text-sm font-semibold tracking-[-0.02em]">Senha</p>
-              <UserPasswordActions userId={user.id} email={user.email ?? ""} />
+              <UserPasswordActions userId={user.id} resetUntil={resetUntil} />
             </div>
           </CardContent>
         </Card>

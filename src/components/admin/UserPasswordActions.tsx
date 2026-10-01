@@ -6,16 +6,17 @@ import { setUserPassword } from "@/app/(admin)/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ResetPasswordButton } from "./ResetPasswordButton";
+import { ResetWindowControl } from "./ResetWindowControl";
 import { FeedbackText } from "./FeedbackText";
 
 interface UserPasswordActionsProps {
   userId: string;
-  email: string;
+  /** Fim da liberação de redefinição no login (null = não liberada). */
+  resetUntil: string | null;
 }
 
-/** Senha: enviar email de redefinição ou definir uma nova diretamente. */
-export function UserPasswordActions({ userId, email }: UserPasswordActionsProps) {
+/** Senha: liberar a redefinição no login ou definir uma nova diretamente. */
+export function UserPasswordActions({ userId, resetUntil }: UserPasswordActionsProps) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -35,9 +36,11 @@ export function UserPasswordActions({ userId, email }: UserPasswordActionsProps)
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       <div className="space-y-2">
-        <Label>Redefinição por email</Label>
-        <p className="text-xs text-muted-foreground">O usuário escolhe a nova senha pelo link.</p>
-        <ResetPasswordButton email={email} />
+        <Label>Redefinição pelo login</Label>
+        <p className="text-xs text-muted-foreground">
+          O usuário define a nova senha em “Esqueceu a senha?”. Vale por 24h e uma única vez.
+        </p>
+        <ResetWindowControl userId={userId} initialUntil={resetUntil} />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
