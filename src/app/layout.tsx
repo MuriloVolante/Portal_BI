@@ -1,9 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter_Tight, Sora } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const display = Sora({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-display",
+});
+
+const body = Inter_Tight({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-body",
+});
 
 export const metadata: Metadata = {
   title: "Portal BI",
@@ -12,7 +22,7 @@ export const metadata: Metadata = {
     capable: true,
     title: "Portal BI",
     // "black" em vez de "black-translucent": o translúcido desenha a página
-    // por baixo da barra de status do iPhone e cobriria o botão do menu.
+    // por baixo da barra de status do iPhone e cobriria o conteúdo do topo.
     statusBarStyle: "black",
   },
   icons: {
@@ -21,7 +31,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1a1a1a",
+  themeColor: "#2D2D2D",
+  // Necessário para env(safe-area-inset-bottom) nas barras inferiores do iPhone.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -29,7 +41,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className={cn("min-h-screen font-sans", inter.variable, inter.className)}>
+      <body className={cn("min-h-screen", display.variable, body.variable)}>
         {children}
       </body>
     </html>

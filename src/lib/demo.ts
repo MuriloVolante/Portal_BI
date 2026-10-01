@@ -22,6 +22,8 @@ export interface DemoUser {
   full_name: string;
   role: Role;
   created_at: string;
+  /** Só para exibição no demo (acesso desativado). */
+  banned?: boolean;
 }
 
 export const DEMO_USERS: DemoUser[] = [
@@ -39,6 +41,11 @@ export const DEMO_USERS: DemoUser[] = [
     role: "user",
     created_at: "2026-01-15T12:00:00Z",
   },
+  // Usuários fictícios extras, para as listas e gráficos do admin terem volume.
+  { id: "00000000-0000-0000-0000-0000000000b2", email: "carlos.mendes@demo.com", full_name: "Carlos Mendes", role: "user", created_at: "2026-02-03T12:00:00Z" },
+  { id: "00000000-0000-0000-0000-0000000000b3", email: "juliana.rocha@demo.com", full_name: "Juliana Rocha", role: "user", created_at: "2026-02-20T12:00:00Z" },
+  { id: "00000000-0000-0000-0000-0000000000b4", email: "patricia.souza@demo.com", full_name: "Patrícia Souza", role: "admin", created_at: "2026-03-11T12:00:00Z" },
+  { id: "00000000-0000-0000-0000-0000000000b5", email: "rafael.lima@demo.com", full_name: "Rafael Lima", role: "user", created_at: "2026-04-02T12:00:00Z", banned: true },
 ];
 
 export function demoFindUserByEmail(email: string): DemoUser | undefined {
@@ -106,12 +113,16 @@ function createInitialStore(): DemoStore {
     },
   ];
 
-  const user = DEMO_USERS[1];
+  const [, user, carlos, juliana, , rafael] = DEMO_USERS;
   return {
     pages,
     permissions: new Set([
       `${user.id}:${pages[0].id}`,
       `${user.id}:${pages[1].id}`,
+      `${carlos.id}:${pages[0].id}`,
+      `${carlos.id}:${pages[2].id}`,
+      `${juliana.id}:${pages[1].id}`,
+      `${rafael.id}:${pages[2].id}`,
     ]),
   };
 }
@@ -219,4 +230,64 @@ export function demoDeletePage(id: string) {
   store.permissions = new Set(
     Array.from(store.permissions).filter((k) => !k.endsWith(`:${id}`))
   );
+}
+
+// ---------- Histórico de acessos fictício (determinístico) ----------
+
+export interface DemoAccessLog {
+  id: string;
+  user_id: string;
+  page_id: string;
+  page_label: string;
+  created_at: string;
+}
+
+/** Gerador pseudoaleatório com semente fixa: o mesmo histórico a cada carga. */
+function seeded(seed: number) {
+  let t = seed;
+  return () => {
+    t = (t + 0x6d2b79f5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Acessos dos últimos 14 dias, do mais recente para o mais antigo. */
+export function demoAccessLogs(): DemoAccessLog[] {
+  const store = demoStore();
+  const rand = seeded(20261001);
+  const now = Date.now();
+  const logs: DemoAccessLog[] = [];
+
+  for (let day = 13; day >= 0; day--) {
+    const weekday = new Date(now - day * 86_400_000).getDay();
+    const busy = weekday === 0 || weekday === 6 ? 0.35 : 1;
+    for (const user of DEMO_USERS) {
+      const pages = store.pages.filter(
+        (p) => user.role === "admin" || store.permissions.has(`${user.id}:${p.id}`)
+      );
+      if (!pages.length || user.banned) continue;
+      const visits = Math.floor(rand() * 4 * busy);
+      for (let v = 0; v < visits; v++) {
+        const page = pages[Math.floor(rand() * pages.length)];
+        const hour = 8 + Math.floor(rand() * 10);
+        const at = new Date(now - day * 86_400_000);
+        at.setUTCHours(hour + 3, Math.floor(rand() * 60), 0, 0);
+        if (at.getTime() > now) continue;
+        logs.push({
+          id: `${day}-${user.id}-${v}`,
+          user_id: user.id,
+          page_id: page.id,
+          page_label: page.label,
+          created_at: at.toISOString(),
+        });
+      }
+    }
+  }
+  return logs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function demoLastSeen(userId: string): string | null {
+  return demoAccessLogs().find((l) => l.user_id === userId)?.created_at ?? null;
 }

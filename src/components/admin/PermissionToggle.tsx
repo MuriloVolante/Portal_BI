@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { icons, LayoutDashboard } from "lucide-react";
 import { toggleUserPage } from "@/app/(admin)/admin/actions";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { getPageIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import type { SidebarPage } from "@/types";
 
@@ -21,9 +21,7 @@ export function PermissionToggle({
 }: PermissionToggleProps) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [pending, startTransition] = useTransition();
-
-  const Icon =
-    (page.icon && icons[page.icon as keyof typeof icons]) || LayoutDashboard;
+  const Icon = getPageIcon(page.icon);
 
   function handleToggle(next: boolean) {
     setEnabled(next);
@@ -34,23 +32,30 @@ export function PermissionToggle({
   }
 
   return (
-    <div
+    <label
       className={cn(
-        "flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-secondary/50",
+        "flex cursor-pointer items-center justify-between gap-3 rounded-[10px] px-3 py-3 transition-colors [transition-duration:200ms] hover:bg-secondary",
         pending && "opacity-70"
       )}
     >
-      <div className="flex items-center gap-3">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">{page.label}</span>
-        {!page.is_active && <Badge variant="secondary">inativa</Badge>}
-      </div>
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors [transition-duration:300ms]",
+            enabled ? "bg-primary/[.12] text-primary" : "bg-secondary text-muted-foreground"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="truncate text-sm font-medium">{page.label}</span>
+        {!page.is_active && <Badge variant="warning">inativa</Badge>}
+      </span>
       <Switch
         checked={enabled}
         onCheckedChange={handleToggle}
         disabled={pending}
         aria-label={`Acesso a ${page.label}`}
       />
-    </div>
+    </label>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { KeyRound, Loader2 } from "lucide-react";
 import { sendPasswordReset } from "@/app/(admin)/admin/actions";
 import { Button } from "@/components/ui/button";
+import { FeedbackText } from "./FeedbackText";
 
 interface ResetPasswordButtonProps {
   email: string;
@@ -24,29 +25,12 @@ export function ResetPasswordButton({ email }: ResetPasswordButtonProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleClick}
-        disabled={pending || !email}
-      >
-        {pending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <KeyRound className="h-4 w-4" />
-        )}
-        Enviar redefinição de senha
+    <div className="space-y-2">
+      <Button variant="outline" onClick={handleClick} disabled={pending || !email}>
+        {pending ? <Loader2 className="animate-spin" /> : <KeyRound />}
+        Enviar email de redefinição
       </Button>
-      {message && (
-        <span
-          className={
-            isError ? "text-sm text-destructive" : "text-sm text-primary"
-          }
-        >
-          {message}
-        </span>
-      )}
+      <FeedbackText message={message} isError={isError} />
     </div>
   );
 }

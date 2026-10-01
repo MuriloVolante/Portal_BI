@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEMO_PASSWORD,
@@ -10,17 +10,10 @@ import {
   demoFindUserByEmail,
   isDemoMode,
 } from "@/lib/demo";
-import { APP_VERSION } from "@/lib/version";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -93,90 +86,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm">
-        <Card className="animate-fade-in">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15">
-            <BarChart3 className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-xl">Portal BI</CardTitle>
-          <CardDescription>
-            Acesse seus dashboards Power BI
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="voce@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-            {info && (
-              <p className="text-sm text-primary" role="status">
-                {info}
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Entrar
-            </Button>
-
-            <Button
+    <AuthShell title="Entrar" subtitle="Acesse seus dashboards Power BI.">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="voce@empresa.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor="password">Senha</Label>
+            <button
               type="button"
-              variant="link"
-              className="w-full"
               onClick={handleForgotPassword}
               disabled={loading}
+              className="text-[13px] font-medium text-primary transition-colors hover:text-primary-hover disabled:opacity-50"
             >
               Esqueci minha senha
-            </Button>
-          </form>
+            </button>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
 
-          {isDemoMode && (
-            <div className="mt-4 rounded-md border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground">
-              <p className="mb-1 font-semibold text-primary">Modo demo ativo</p>
-              <p>
-                admin: <span className="font-mono">admin@demo.com</span>
-                <br />
-                usuário: <span className="font-mono">user@demo.com</span>
-                <br />
-                senha: <span className="font-mono">demo123</span>
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-        <p className="mt-4 text-center text-xs text-muted-foreground/60">
-          v{APP_VERSION}
-        </p>
-      </div>
-    </div>
+        {error && (
+          <p className="animate-rise-in text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        {info && (
+          <p className="animate-rise-in text-sm text-primary" role="status">
+            {info}
+          </p>
+        )}
+
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          {loading && <Loader2 className="animate-spin" />}
+          Entrar
+        </Button>
+      </form>
+
+      {isDemoMode && (
+        <div className="mt-6 rounded-xl border border-primary/30 bg-primary/[.08] p-3.5 text-xs text-muted-foreground">
+          <p className="mb-1 font-semibold text-primary">Modo demo ativo</p>
+          <p>
+            admin: <span className="font-mono text-foreground">admin@demo.com</span>
+            <br />
+            usuário: <span className="font-mono text-foreground">user@demo.com</span>
+            <br />
+            senha: <span className="font-mono text-foreground">demo123</span>
+          </p>
+        </div>
+      )}
+    </AuthShell>
   );
 }

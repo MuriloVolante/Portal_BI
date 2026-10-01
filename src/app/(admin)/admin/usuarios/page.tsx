@@ -1,7 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { DEMO_USERS, demoCountPermissions, isDemoMode } from "@/lib/demo";
+import { DEMO_USERS, demoCountPermissions, demoLastSeen, isDemoMode } from "@/lib/demo";
 import { UserTable } from "@/components/admin/UserTable";
 import { CreateUserDialog } from "@/components/admin/CreateUserDialog";
+import { PageHeader } from "@/components/admin/PageHeader";
 import type { AdminUserRow, Role } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -23,23 +24,18 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       role: u.role,
       page_count: demoCountPermissions(u.id),
       created_at: u.created_at,
-      banned: false,
-      // No demo, o admin "entrou agora" e o usuário comum nunca entrou.
-      last_sign_in_at: u.role === "admin" ? new Date().toISOString() : null,
-      last_seen_at: null,
+      banned: !!u.banned,
+      last_sign_in_at: null,
+      last_seen_at: demoLastSeen(u.id),
     }));
 
     return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
-            <p className="text-sm text-muted-foreground">
-              Gerencie quem acessa o portal e suas permissões.
-            </p>
-          </div>
-          <CreateUserDialog />
-        </div>
+      <div className="animate-view-in">
+        <PageHeader
+          title="Usuários"
+          description="Gerencie quem acessa o portal e suas permissões."
+          actions={<CreateUserDialog />}
+        />
         <UserTable rows={rows} currentPage={1} hasNextPage={false} />
       </div>
     );
@@ -99,16 +95,12 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
-          <p className="text-sm text-muted-foreground">
-            Gerencie quem acessa o portal e suas permissões.
-          </p>
-        </div>
-        <CreateUserDialog />
-      </div>
+    <div className="animate-view-in">
+      <PageHeader
+        title="Usuários"
+        description="Gerencie quem acessa o portal e suas permissões."
+        actions={<CreateUserDialog />}
+      />
 
       <UserTable
         rows={rows}

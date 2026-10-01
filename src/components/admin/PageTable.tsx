@@ -2,14 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  icons,
-  LayoutDashboard,
-  Loader2,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { createPage, deletePage, updatePage } from "@/app/(admin)/admin/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "./PageHeader";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { getPageIcon, isKnownPageIcon, PAGE_ICON_NAMES } from "@/lib/icons";
 import type { SidebarPage } from "@/types";
 
 interface PageTableProps {
@@ -61,7 +57,7 @@ const emptyForm: FormState = {
 function slugify(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
@@ -75,6 +71,9 @@ export function PageTable({ pages }: PageTableProps) {
   const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [toDelete, setToDelete] = useState<SidebarPage | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, startDelete] = useTransition();
 
   function openCreate() {
     setEditing(null);
@@ -117,89 +116,99 @@ export function PageTable({ pages }: PageTableProps) {
     });
   }
 
-  function handleDelete(page: SidebarPage) {
-    if (
-      !window.confirm(
-        `Remover a página "${page.label}"? As permissões associadas também serão removidas.`
-      )
-    ) {
-      return;
-    }
-    startTransition(async () => {
-      await deletePage(page.id);
+  function confirmDelete() {
+    if (!toDelete) return;
+    setDeleteError(null);
+    startDelete(async () => {
+      const result = await deletePage(toDelete.id);
+      if (result.error) {
+        setDeleteError(result.error);
+        return;
+      }
+      setToDelete(null);
       router.refresh();
     });
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Nova página
-        </Button>
-      </div>
+  const PreviewIcon = getPageIcon(form.icon);
+  const iconUnknown = form.icon.trim() !== "" && !isKnownPageIcon(form.icon);
 
-      <Card>
+  return (
+    <>
+      <PageHeader
+        title="Páginas"
+        description="Cadastre e gerencie os dashboards disponíveis no portal."
+        actions={
+          <Button onClick={openCreate}>
+            <Plus />
+            Nova página
+          </Button>
+        }
+      />
+
+      <Card className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="pl-4">Página</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Ordem</TableHead>
+              <TableHead className="pl-5">Painel</TableHead>
+              <TableHead className="hidden md:table-cell">Endereço</TableHead>
+              <TableHead className="hidden md:table-cell">Ordem</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="pr-4 text-right">Ações</TableHead>
+              <TableHead className="pr-5 text-right">
+                <span className="sr-only">Ações</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pages.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="h-24 text-center text-muted-foreground"
-                >
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                   Nenhuma página cadastrada.
                 </TableCell>
               </TableRow>
             ) : (
-              pages.map((page) => {
-                const Icon =
-                  (page.icon && icons[page.icon as keyof typeof icons]) ||
-                  LayoutDashboard;
+              pages.map((page, i) => {
+                const Icon = getPageIcon(page.icon);
                 return (
-                  <TableRow key={page.id}>
-                    <TableCell className="pl-4">
-                      <div className="flex items-center gap-2 font-medium">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
-                        {page.label}
+                  <TableRow key={page.id} className="stagger" style={{ "--i": i } as React.CSSProperties}>
+                    <TableCell className="pl-5">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{page.label}</p>
+                          <p className="truncate font-mono text-xs text-tertiary md:hidden">/{page.slug}</p>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {page.slug}
+                    <TableCell className="hidden font-mono text-[13px] text-muted-foreground md:table-cell">
+                      /dashboard/{page.slug}
                     </TableCell>
-                    <TableCell>{page.order}</TableCell>
+                    <TableCell className="hidden tabular-nums md:table-cell">{page.order}</TableCell>
                     <TableCell>
-                      <Badge variant={page.is_active ? "default" : "secondary"}>
+                      <Badge variant={page.is_active ? "default" : "warning"}>
                         {page.is_active ? "ativa" : "inativa"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="pr-4 text-right">
+                    <TableCell className="pr-5 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEdit(page)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Editar
+                        <Button variant="outline" size="sm" onClick={() => openEdit(page)}>
+                          <Pencil className="!size-3.5" />
+                          <span className="hidden sm:inline">Editar</span>
+                          <span className="sr-only sm:hidden">Editar {page.label}</span>
                         </Button>
                         <Button
-                          variant="destructive"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(page)}
-                          disabled={pending}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setToDelete(page);
+                          }}
+                          className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                          aria-label={`Excluir ${page.label}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="!size-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -211,16 +220,29 @@ export function PageTable({ pages }: PageTableProps) {
         </Table>
       </Card>
 
+      <ConfirmDialog
+        open={!!toDelete}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title="Excluir este painel?"
+        description={
+          <>
+            <span className="text-foreground">{toDelete?.label}</span> sai do portal e as liberações de todos os
+            usuários para ele são removidas. Essa ação é permanente.
+          </>
+        }
+        confirmLabel="Excluir painel"
+        destructive
+        pending={deleting}
+        error={deleteError}
+        onConfirm={confirmDelete}
+      />
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editing ? "Editar página" : "Nova página"}
-            </DialogTitle>
+            <DialogTitle>{editing ? "Editar página" : "Nova página"}</DialogTitle>
             <DialogDescription>
-              {editing
-                ? "Atualize os dados do dashboard."
-                : "Cadastre um novo dashboard Power BI."}
+              {editing ? "Atualize os dados do dashboard." : "Cadastre um novo dashboard Power BI."}
             </DialogDescription>
           </DialogHeader>
 
@@ -258,10 +280,8 @@ export function PageTable({ pages }: PageTableProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Vira o endereço da página:{" "}
-                <span className="font-mono">
-                  /dashboard/{form.slug || "vendas"}
-                </span>
-                . Não cole a URL do Power BI aqui — ela vai no campo abaixo.
+                <span className="font-mono text-foreground">/dashboard/{form.slug || "vendas"}</span>. Não cole a URL do
+                Power BI aqui — ela vai no campo abaixo.
               </p>
             </div>
             <div className="space-y-2">
@@ -270,25 +290,39 @@ export function PageTable({ pages }: PageTableProps) {
                 id="embed_url"
                 type="password"
                 value={form.embed_url}
-                onChange={(e) =>
-                  setForm({ ...form, embed_url: e.target.value })
-                }
-                placeholder={
-                  editing ? "•••••• (deixe vazio para manter)" : "https://app.powerbi.com/view?r=..."
-                }
+                onChange={(e) => setForm({ ...form, embed_url: e.target.value })}
+                placeholder={editing ? "•••••• (deixe vazio para manter)" : "https://app.powerbi.com/view?r=..."}
                 autoComplete="off"
                 required={!editing}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-[1fr_96px] gap-4">
               <div className="space-y-2">
-                <Label htmlFor="icon">Ícone (lucide)</Label>
-                <Input
-                  id="icon"
-                  value={form.icon}
-                  onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                  placeholder="BarChart3"
-                />
+                <Label htmlFor="icon">Ícone</Label>
+                <div className="flex gap-2">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-primary"
+                    aria-hidden="true"
+                  >
+                    <PreviewIcon className="h-[18px] w-[18px]" />
+                  </span>
+                  <Input
+                    id="icon"
+                    list="page-icon-names"
+                    value={form.icon}
+                    onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                    placeholder="ChartColumnIncreasing"
+                    autoComplete="off"
+                  />
+                  <datalist id="page-icon-names">
+                    {PAGE_ICON_NAMES.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </div>
+                {iconUnknown && (
+                  <p className="text-xs text-warning">Ícone não reconhecido — será usado o ícone padrão.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="order">Ordem</Label>
@@ -296,22 +330,21 @@ export function PageTable({ pages }: PageTableProps) {
                   id="order"
                   type="number"
                   value={form.order}
-                  onChange={(e) =>
-                    setForm({ ...form, order: Number(e.target.value) })
-                  }
+                  onChange={(e) => setForm({ ...form, order: Number(e.target.value) })}
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-              <Label htmlFor="is_active" className="cursor-pointer">
-                Página ativa
-              </Label>
+            <label
+              htmlFor="is_active"
+              className="flex cursor-pointer items-center justify-between rounded-[10px] border bg-background/50 px-3 py-3"
+            >
+              <span className="text-sm font-medium">Página ativa</span>
               <Switch
                 id="is_active"
                 checked={form.is_active}
                 onCheckedChange={(v) => setForm({ ...form, is_active: v })}
               />
-            </div>
+            </label>
 
             {error && (
               <p className="text-sm text-destructive" role="alert">
@@ -320,22 +353,17 @@ export function PageTable({ pages }: PageTableProps) {
             )}
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setOpen(false)}
-                disabled={pending}
-              >
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={pending}>
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {pending && <Loader2 className="animate-spin" />}
                 {editing ? "Salvar" : "Criar"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { APP_VERSION } from "@/lib/version";
-import { AdminNav } from "@/components/admin/AdminNav";
+import { AdminNav, AdminTabBar } from "@/components/admin/AdminNav";
+import { SidebarFrame, footerLinkClass } from "@/components/shell/SidebarFrame";
 
 export default async function AdminLayout({
   children,
@@ -10,44 +11,31 @@ export default async function AdminLayout({
   await requireAdmin();
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden h-screen w-64 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground md:flex md:sticky md:top-0">
-        <div className="flex h-16 items-center gap-2 border-b px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15">
-            <BarChart3 className="h-4 w-4 text-primary" />
-          </div>
-          <span className="text-base font-semibold tracking-tight">
-            Portal BI{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              admin
-            </span>
-          </span>
-        </div>
-
+    <div className="flex h-[100dvh] overflow-hidden">
+      <SidebarFrame
+        tag="admin"
+        sectionLabel="Administração"
+        footer={
+          <>
+            <Link href="/" className={footerLinkClass}>
+              <ArrowLeft className="h-[17px] w-[17px] shrink-0" />
+              Voltar ao portal
+            </Link>
+            <p className="px-3 pt-1 text-[11px] text-tertiary">Portal BI v{APP_VERSION}</p>
+          </>
+        }
+      >
         <AdminNav />
+      </SidebarFrame>
 
-        <div className="border-t p-3">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            Voltar ao portal
-          </Link>
-          <p className="px-3 pt-2 text-xs text-muted-foreground/70">
-            Portal BI v{APP_VERSION}
-          </p>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl p-6 md:p-10 animate-fade-in">
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-5xl px-4 pb-[calc(86px+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-10 md:pb-12 md:pt-10">
           {children}
-          <p className="pt-8 text-center text-xs text-muted-foreground/60 md:hidden">
-            Portal BI v{APP_VERSION}
-          </p>
+          <p className="pt-10 text-center text-[11px] text-tertiary md:hidden">Portal BI v{APP_VERSION}</p>
         </div>
       </main>
+
+      <AdminTabBar />
     </div>
   );
 }

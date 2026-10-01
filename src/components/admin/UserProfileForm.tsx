@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FeedbackText } from "./FeedbackText";
 import type { Role } from "@/types";
 
 interface UserProfileFormProps {
@@ -60,7 +61,7 @@ export function UserProfileForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="profile-admin">Administrador</Label>
-          <div className="flex h-9 items-center gap-3">
+          <div className="flex h-10 items-center gap-3">
             <Switch
               id="profile-admin"
               checked={isAdmin}
@@ -68,28 +69,18 @@ export function UserProfileForm({
               disabled={isSelf}
             />
             <span className="text-xs text-muted-foreground">
-              {isSelf
-                ? "Você não pode alterar o próprio papel."
-                : "Acessa tudo, inclusive esta área."}
+              {isSelf ? "Você não pode alterar o próprio papel." : "Acessa tudo, inclusive esta área."}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending && <Loader2 className="animate-spin" />}
           Salvar dados
         </Button>
-        {message && (
-          <span
-            className={
-              isError ? "text-sm text-destructive" : "text-sm text-primary"
-            }
-          >
-            {message}
-          </span>
-        )}
+        <FeedbackText message={message} isError={isError} />
       </div>
     </form>
   );

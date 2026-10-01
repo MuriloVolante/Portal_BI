@@ -23,14 +23,7 @@ export default async function PagesAdminPage() {
   const pages = await getPages();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Páginas</h1>
-        <p className="text-sm text-muted-foreground">
-          Cadastre e gerencie os dashboards disponíveis no portal.
-        </p>
-      </div>
-
+    <div className="animate-view-in">
       <PageTable pages={pages} />
     </div>
   );

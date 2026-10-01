@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ReportSkeleton } from "./ReportSkeleton";
 
 /**
  * Altura do rodapé do Power BI escondida por crop visual:
@@ -14,9 +14,10 @@ const POWER_BI_FOOTER_CROP_PX = 72;
 interface PowerBIFrameProps {
   src: string;
   title?: string;
+  onLoaded?: () => void;
 }
 
-export function PowerBIFrame({ src, title }: PowerBIFrameProps) {
+export function PowerBIFrame({ src, title, onLoaded }: PowerBIFrameProps) {
   const [loaded, setLoaded] = useState(false);
 
   // Ao trocar apenas o src (sem remontar o componente), volta ao skeleton.
@@ -25,10 +26,10 @@ export function PowerBIFrame({ src, title }: PowerBIFrameProps) {
   }, [src]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden bg-background">
       {!loaded && (
-        <div className="absolute inset-0 z-10 p-4">
-          <Skeleton className="h-full w-full" />
+        <div className="absolute inset-0 z-10 bg-background">
+          <ReportSkeleton />
         </div>
       )}
       <iframe
@@ -36,7 +37,10 @@ export function PowerBIFrame({ src, title }: PowerBIFrameProps) {
         title={title ?? "Dashboard Power BI"}
         loading="eager"
         allowFullScreen
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+          setLoaded(true);
+          onLoaded?.();
+        }}
         className="absolute inset-x-0 top-0 w-full border-0"
         style={{ height: `calc(100% + ${POWER_BI_FOOTER_CROP_PX}px)` }}
       />

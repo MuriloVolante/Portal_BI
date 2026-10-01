@@ -61,7 +61,7 @@ export function CreateUserDialog() {
   return (
     <>
       <Button onClick={openDialog}>
-        <UserPlus className="h-4 w-4" />
+        <UserPlus />
         Novo usuário
       </Button>
 
@@ -113,7 +113,7 @@ export function CreateUserDialog() {
                 required
               />
             </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3 rounded-[10px] border bg-background/50 px-3 py-3">
               <div>
                 <Label htmlFor="new-admin" className="cursor-pointer">
                   Administrador
@@ -145,7 +145,7 @@ export function CreateUserDialog() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={pending}>
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {pending && <Loader2 className="animate-spin" />}
                 Criar usuário
               </Button>
             </DialogFooter>
