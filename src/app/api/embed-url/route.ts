@@ -54,18 +54,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  // 2. Busca a página (service role — embed_url é invisível ao client)
+  // 2. Busca a página (service role — embed_url é invisível ao client) e o
+  // papel do usuário em paralelo.
   const admin = createAdminClient();
-  const { data: page } = await admin
-    .from("pages")
-    .select("id, label, embed_url, is_active")
-    .eq("slug", pageSlug)
-    .maybeSingle<{
-      id: string;
-      label: string;
-      embed_url: string;
-      is_active: boolean;
-    }>();
+  const [{ data: page }, { data: profile }] = await Promise.all([
+    admin
+      .from("pages")
+      .select("id, label, embed_url, is_active")
+      .eq("slug", pageSlug)
+      .maybeSingle<{
+        id: string;
+        label: string;
+        embed_url: string;
+        is_active: boolean;
+      }>(),
+    admin
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle<{ role: string }>(),
+  ]);
 
   if (!page || !page.is_active) {
     return NextResponse.json(
@@ -75,12 +83,6 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Verifica a permissão (admin tem acesso a tudo)
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle<{ role: string }>();
-
   if (profile?.role !== "admin") {
     const { count } = await admin
       .from("user_pages")

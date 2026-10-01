@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -15,8 +16,11 @@ export interface SessionInfo {
   profile: Profile | null;
 }
 
-/** Retorna o usuário autenticado e seu profile, ou null. */
-export async function getSessionInfo(): Promise<SessionInfo | null> {
+/**
+ * Retorna o usuário autenticado e seu profile, ou null. Memorizado por
+ * requisição: layout e página compartilham as mesmas consultas.
+ */
+export const getSessionInfo = cache(async function getSessionInfo(): Promise<SessionInfo | null> {
   if (isDemoMode) {
     const id = cookies().get(DEMO_SESSION_COOKIE)?.value;
     const demoUser = demoGetUser(id);
@@ -46,7 +50,7 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
     .single<Profile>();
 
   return { user, profile };
-}
+});
 
 /** Exige sessão válida — redireciona para /login caso contrário. */
 export async function requireUser(): Promise<SessionInfo> {
