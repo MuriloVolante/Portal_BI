@@ -89,33 +89,39 @@ npm run dev
 
 ## Exportação do Banco de Horas (Excel)
 
-No painel com slug **`banco-horas`**, o cabeçalho ganha o botão **Exportar**.
-Ele abre um modal (gerência + saldo mínimo em horas) e baixa um `.xlsx`
-gerado no servidor a partir do SQL Server.
+No painel com slug **`banco-horas`**, o cabeçalho ganha o botão **Exportar**:
+modal com Cargo, Filial, Gerência e Local (caixas de seleção) e saldo maior ou
+igual a (horas decimais) → `.xlsx` gerado no servidor a partir do SQL Server.
 
-- Rotas: `GET /api/banco-horas/gerencias` (opções do select) e
-  `GET /api/banco-horas/export?saldoMin=40&gerencia=MANUTENÇÃO` (planilha).
-  Ambas exigem sessão e acesso ao painel `banco-horas` (mesma regra do embed).
-- Consultas em `src/lib/bancoHoras/source.ts`, sempre parametrizadas. As
-  colunas do Excel são as colunas que a consulta devolve (use `AS` para os
-  nomes). Ajuste a view/tabela e as colunas lá.
-- Variáveis de ambiente (só na Vercel, nunca no código):
+- Rotas: `GET /api/banco-horas/opcoes` (valores das caixas de seleção),
+  `GET /api/banco-horas/export?cargo=&filial=&gerencia=&local=&saldoMin=` (planilha)
+  e `POST /api/banco-horas/diagnostico` (teste de conexão, só admin).
+  Opções e exportação exigem acesso ao painel `banco-horas` (mesma regra do embed).
+- **View e colunas** ficam em `src/lib/bancoHoras/source.ts` (`VIEW`, `COLUMNS`).
+  Todos os filtros entram como parâmetro na consulta.
+- **Auditoria**: toda exportação (ok, sem dados, erro, acesso negado), falha ao
+  carregar os filtros e teste de conexão vai para `export_logs`
+  (migration `0004`), com filtros, linhas, duração, código do erro e detalhe
+  técnico. Admin → **Exportações** mostra o histórico e o teste de conexão
+  etapa por etapa (configuração → DNS → porta → login → leitura da view), com
+  o IP de saída e um botão para copiar o relatório para a TI.
+
+### Variáveis de ambiente (Vercel → Settings → Environment Variables)
 
 | Variável | Exemplo | Obrigatória |
 |---|---|---|
-| `MSSQL_SERVER` | `sql.empresa.com.br` | sim |
+| `MSSQL_SERVER` | `sql.empresa.com.br` ou IP público | sim |
 | `MSSQL_DATABASE` | `RH` | sim |
 | `MSSQL_USER` | `portal_bi_leitura` | sim |
 | `MSSQL_PASSWORD` | — | sim |
 | `MSSQL_PORT` | `1433` (padrão) | não |
-| `MSSQL_ENCRYPT` | `true` (padrão); `false` para servidor sem TLS | não |
+| `MSSQL_ENCRYPT` | `true` (padrão); `false` se o servidor não usa TLS | não |
 | `MSSQL_TRUST_SERVER_CERTIFICATE` | `true` para certificado autoassinado | não |
 
-- Use um usuário **somente leitura**, com acesso apenas à view usada.
-- O SQL Server precisa aceitar conexões vindas da Vercel (região `gru1`, IPs
-  dinâmicos). Se ele estiver só na rede interna, é preciso liberar o acesso
-  (firewall/porta pública com TLS) ou publicar a view por outro caminho.
-- No modo demo a exportação usa dados fictícios.
+Marque o ambiente **Production** e faça um **Redeploy** depois de salvar
+(variáveis novas só valem para deploys novos). Use um login SQL **somente
+leitura**, com `SELECT` apenas na view. O SQL Server precisa aceitar conexões
+vindas da internet (Vercel, região `gru1`, IPs dinâmicos).
 
 ## Modelo de segurança
 

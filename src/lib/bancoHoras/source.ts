@@ -1,64 +1,102 @@
 import "server-only";
 import sql from "mssql";
 import { isDemoMode } from "@/lib/demo";
-import type { BancoHorasFilters } from "./filters";
+import { SELECT_FILTERS, type BancoHorasFilters, type BancoHorasOptions } from "./filters";
 
 /*
  * ============================================================================
- *  CONSULTAS DO SQL SERVER — ajuste aqui os nomes de tabela/view e colunas.
+ *  ONDE ESTÃO OS DADOS — confirme com a TI e ajuste aqui.
  * ============================================================================
- *  - Sempre parametrizadas (@gerencia, @saldoMin): o valor digitado pelo
- *    gestor nunca entra no texto do SQL.
- *  - As colunas do Excel são exatamente as colunas que a consulta devolve,
- *    na mesma ordem e com os mesmos nomes (use AS para dar nomes legíveis).
- *  - Colunas numéricas saem como número no Excel (dá para somar/filtrar).
+ *  VIEW: tabela ou view (com schema) que tem uma linha por colaborador.
+ *  COLUMNS: nome real de cada coluna na view.
+ *  EXPORT_COLUMNS: colunas da planilha, na ordem, com o título do Excel.
  */
-const SQL_EXPORT = `
-  SELECT
-    Matricula AS [Matrícula],
-    Nome      AS [Colaborador],
-    Gerencia  AS [Gerência],
-    Setor     AS [Setor],
-    Saldo     AS [Saldo (h)]
-  FROM dbo.vw_BancoHoras
-  WHERE (@gerencia IS NULL OR Gerencia = @gerencia)
-    AND (@saldoMin IS NULL OR Saldo >= @saldoMin)
-  ORDER BY Saldo DESC, Nome
-`;
+export const VIEW = "dbo.vw_BancoHoras";
 
-const SQL_GERENCIAS = `
-  SELECT DISTINCT Gerencia AS gerencia
-  FROM dbo.vw_BancoHoras
-  WHERE Gerencia IS NOT NULL AND LTRIM(RTRIM(Gerencia)) <> ''
-  ORDER BY Gerencia
-`;
+const COLUMNS = {
+  matricula: "Matricula",
+  nome: "Nome",
+  cargo: "Cargo",
+  filial: "Filial",
+  gerencia: "Gerencia",
+  local: "Local",
+  saldo: "Saldo", // horas decimais (ex.: 40.5)
+} as const;
+
+const EXPORT_COLUMNS: { column: keyof typeof COLUMNS; title: string }[] = [
+  { column: "matricula", title: "Matrícula" },
+  { column: "nome", title: "Colaborador" },
+  { column: "cargo", title: "Cargo" },
+  { column: "filial", title: "Filial" },
+  { column: "gerencia", title: "Gerência" },
+  { column: "local", title: "Local" },
+  { column: "saldo", title: "Saldo (h)" },
+];
 
 /** Limite de segurança para não montar planilhas gigantes por engano. */
 const MAX_ROWS = 50_000;
 
+// ---------------------------------------------------------------------------
+// SQL montado a partir da configuração acima. Valores digitados pelo gestor
+// SEMPRE entram como parâmetro (@cargo, @saldoMin…), nunca no texto.
+// ---------------------------------------------------------------------------
+
+/** [schema].[objeto] — só aceita nomes simples (letras, números, _). */
+function quoteIdent(name: string) {
+  return name
+    .split(".")
+    .map((part) => {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(part)) throw new Error(`Nome inválido na configuração: ${name}`);
+      return `[${part}]`;
+    })
+    .join(".");
+}
+
+const col = (key: keyof typeof COLUMNS) => quoteIdent(COLUMNS[key]);
+
+const SQL_EXPORT = `
+  SELECT TOP (${MAX_ROWS + 1})
+    ${EXPORT_COLUMNS.map((c) => `${col(c.column)} AS [${c.title}]`).join(",\n    ")}
+  FROM ${quoteIdent(VIEW)}
+  WHERE ${SELECT_FILTERS.map(({ key }) => `(@${key} IS NULL OR ${col(key)} = @${key})`).join("\n    AND ")}
+    AND (@saldoMin IS NULL OR ${col("saldo")} >= @saldoMin)
+  ORDER BY ${col("saldo")} DESC, ${col("nome")}
+`;
+
+const SQL_OPTIONS = SELECT_FILTERS.map(
+  ({ key }) => `
+  SELECT DISTINCT '${key}' AS campo, CAST(LTRIM(RTRIM(${col(key)})) AS NVARCHAR(200)) AS valor
+  FROM ${quoteIdent(VIEW)}
+  WHERE ${col(key)} IS NOT NULL AND LTRIM(RTRIM(${col(key)})) <> ''`
+).join("\n  UNION ALL") + "\n  ORDER BY campo, valor";
+
+/** Consulta mínima usada pelo diagnóstico: valida view, colunas e permissão. */
+export const SQL_PROBE = `SELECT TOP (1) ${Object.keys(COLUMNS)
+  .map((k) => col(k as keyof typeof COLUMNS))
+  .join(", ")} FROM ${quoteIdent(VIEW)}`;
+
 export type BancoHorasRow = Record<string, string | number | Date | null>;
 
-export class BancoHorasConfigError extends Error {}
+export class BancoHorasConfigError extends Error {
+  name = "BancoHorasConfigError";
+}
 
 // ---------------------------------------------------------------------------
 // Conexão (credenciais SÓ em variáveis de ambiente da Vercel)
 // ---------------------------------------------------------------------------
 
-function readConfig(): sql.config {
-  const server = process.env.MSSQL_SERVER;
-  const database = process.env.MSSQL_DATABASE;
-  const user = process.env.MSSQL_USER;
-  const password = process.env.MSSQL_PASSWORD;
-  if (!server || !database || !user || !password) {
-    throw new BancoHorasConfigError(
-      "Conexão com o SQL Server não configurada (MSSQL_SERVER, MSSQL_DATABASE, MSSQL_USER, MSSQL_PASSWORD)."
-    );
+export const REQUIRED_ENV = ["MSSQL_SERVER", "MSSQL_DATABASE", "MSSQL_USER", "MSSQL_PASSWORD"] as const;
+
+export function readSqlConfig(): sql.config {
+  const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
+  if (missing.length) {
+    throw new BancoHorasConfigError(`Variáveis ausentes: ${missing.join(", ")}`);
   }
   return {
-    server,
-    database,
-    user,
-    password,
+    server: process.env.MSSQL_SERVER!,
+    database: process.env.MSSQL_DATABASE!,
+    user: process.env.MSSQL_USER!,
+    password: process.env.MSSQL_PASSWORD!,
     port: Number(process.env.MSSQL_PORT) || 1433,
     connectionTimeout: 15_000,
     requestTimeout: 45_000,
@@ -75,7 +113,7 @@ const globalForSql = globalThis as unknown as { __bancoHorasPool?: Promise<sql.C
 
 function getPool(): Promise<sql.ConnectionPool> {
   if (!globalForSql.__bancoHorasPool) {
-    const pool = new sql.ConnectionPool(readConfig());
+    const pool = new sql.ConnectionPool(readSqlConfig());
     globalForSql.__bancoHorasPool = pool.connect().catch((err) => {
       // Falhou: a próxima requisição tenta conectar de novo.
       globalForSql.__bancoHorasPool = undefined;
@@ -92,38 +130,46 @@ function getPool(): Promise<sql.ConnectionPool> {
 // Consultas
 // ---------------------------------------------------------------------------
 
-export async function listGerencias(): Promise<string[]> {
-  if (isDemoMode) return DEMO_GERENCIAS;
+export async function listBancoHorasOptions(): Promise<BancoHorasOptions> {
+  if (isDemoMode) return demoOptions();
   const pool = await getPool();
-  const result = await pool.request().query<{ gerencia: string }>(SQL_GERENCIAS);
-  return result.recordset.map((r) => String(r.gerencia).trim());
+  const result = await pool.request().query<{ campo: string; valor: string }>(SQL_OPTIONS);
+  const options = Object.fromEntries(SELECT_FILTERS.map(({ key }) => [key, [] as string[]])) as BancoHorasOptions;
+  for (const row of result.recordset) {
+    options[row.campo as keyof BancoHorasOptions]?.push(row.valor);
+  }
+  return options;
 }
 
 export async function fetchBancoHoras(
   filters: BancoHorasFilters
 ): Promise<{ columns: string[]; rows: BancoHorasRow[]; truncated: boolean }> {
-  if (isDemoMode) return demoBancoHoras(filters);
+  const columns = EXPORT_COLUMNS.map((c) => c.title);
+  let rows: BancoHorasRow[];
 
-  const pool = await getPool();
-  const result = await pool
-    .request()
-    .input("gerencia", sql.NVarChar(120), filters.gerencia)
-    .input("saldoMin", sql.Decimal(18, 2), filters.saldoMin)
-    .query<BancoHorasRow>(SQL_EXPORT);
+  if (isDemoMode) {
+    rows = demoRows(filters);
+  } else {
+    const request = (await getPool()).request();
+    for (const { key } of SELECT_FILTERS) request.input(key, sql.NVarChar(200), filters[key]);
+    request.input("saldoMin", sql.Decimal(18, 2), filters.saldoMin);
+    rows = (await request.query<BancoHorasRow>(SQL_EXPORT)).recordset;
+  }
 
-  const columns = Object.keys(result.recordset.columns ?? {}).sort(
-    (a, b) => (result.recordset.columns[a].index ?? 0) - (result.recordset.columns[b].index ?? 0)
-  );
-  const truncated = result.recordset.length > MAX_ROWS;
-  return { columns, rows: truncated ? result.recordset.slice(0, MAX_ROWS) : result.recordset, truncated };
+  const truncated = rows.length > MAX_ROWS;
+  return { columns, rows: truncated ? rows.slice(0, MAX_ROWS) : rows, truncated };
 }
 
 // ---------------------------------------------------------------------------
 // Modo demo: dados fictícios, mesmas regras de filtro
 // ---------------------------------------------------------------------------
 
-const DEMO_GERENCIAS = ["ADMINISTRATIVO", "MANUTENÇÃO", "OPERAÇÃO", "RECURSOS HUMANOS", "TRÁFEGO"];
-const DEMO_SETORES = ["Oficina", "Garagem", "Escala", "Atendimento", "Pessoal", "Frota"];
+const DEMO_VALUES = {
+  cargo: ["ANALISTA DE RH", "AUXILIAR ADMINISTRATIVO", "MECÂNICO", "MOTORISTA", "SUPERVISOR"],
+  filial: ["APUCARANA", "CURITIBA", "LONDRINA", "MARINGÁ"],
+  gerencia: ["ADMINISTRATIVO", "MANUTENÇÃO", "OPERAÇÃO", "RECURSOS HUMANOS", "TRÁFEGO"],
+  local: ["ESCRITÓRIO", "GARAGEM", "OFICINA", "RODOVIÁRIA"],
+};
 const DEMO_NOMES = [
   "Ana Paula Ribeiro", "Bruno Carvalho", "Carla Nogueira", "Diego Martins", "Eduardo Lima",
   "Fernanda Alves", "Gustavo Pereira", "Helena Costa", "Igor Fernandes", "Joana Duarte",
@@ -131,20 +177,26 @@ const DEMO_NOMES = [
   "Renata Gomes", "Sérgio Moura", "Tatiane Dias", "Vinícius Araújo", "Wagner Pinto",
 ];
 
-function demoBancoHoras(filters: BancoHorasFilters) {
-  const columns = ["Matrícula", "Colaborador", "Gerência", "Setor", "Saldo (h)"];
+function demoOptions(): BancoHorasOptions {
+  return DEMO_VALUES;
+}
+
+function demoRows(filters: BancoHorasFilters): BancoHorasRow[] {
   let seed = 42;
   const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  const all: BancoHorasRow[] = Array.from({ length: 140 }, (_, i) => ({
-    "Matrícula": 10_000 + i * 7,
-    "Colaborador": `${DEMO_NOMES[i % DEMO_NOMES.length]}${i >= DEMO_NOMES.length ? ` ${Math.floor(i / DEMO_NOMES.length) + 1}` : ""}`,
-    "Gerência": DEMO_GERENCIAS[Math.floor(rand() * DEMO_GERENCIAS.length)],
-    "Setor": DEMO_SETORES[Math.floor(rand() * DEMO_SETORES.length)],
-    "Saldo (h)": Math.round((rand() * 140 - 30) * 2) / 2,
+  const pick = (list: string[]) => list[Math.floor(rand() * list.length)];
+  const all = Array.from({ length: 220 }, (_, i) => ({
+    matricula: 10_000 + i * 7,
+    nome: `${DEMO_NOMES[i % DEMO_NOMES.length]}${i >= DEMO_NOMES.length ? ` ${Math.floor(i / DEMO_NOMES.length) + 1}` : ""}`,
+    cargo: pick(DEMO_VALUES.cargo),
+    filial: pick(DEMO_VALUES.filial),
+    gerencia: pick(DEMO_VALUES.gerencia),
+    local: pick(DEMO_VALUES.local),
+    saldo: Math.round((rand() * 140 - 30) * 100) / 100,
   }));
-  const rows = all
-    .filter((r) => !filters.gerencia || r["Gerência"] === filters.gerencia)
-    .filter((r) => filters.saldoMin === null || (r["Saldo (h)"] as number) >= filters.saldoMin)
-    .sort((a, b) => (b["Saldo (h)"] as number) - (a["Saldo (h)"] as number));
-  return { columns, rows, truncated: false };
+  return all
+    .filter((r) => SELECT_FILTERS.every(({ key }) => !filters[key] || r[key] === filters[key]))
+    .filter((r) => filters.saldoMin === null || r.saldo >= filters.saldoMin)
+    .sort((a, b) => b.saldo - a.saldo || a.nome.localeCompare(b.nome, "pt-BR"))
+    .map((r) => Object.fromEntries(EXPORT_COLUMNS.map((c) => [c.title, r[c.column]])));
 }

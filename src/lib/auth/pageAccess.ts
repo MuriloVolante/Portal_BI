@@ -5,8 +5,8 @@ import { getSessionInfo } from "@/lib/auth/session";
 import { demoGetPageBySlug, demoHasPermission, isDemoMode } from "@/lib/demo";
 
 export type PageAccess =
-  | { ok: true; user: User; page: { id: string; label: string } }
-  | { ok: false; status: 401 | 403 | 404; error: string };
+  | { ok: true; user: User; isAdmin: boolean; page: { id: string; label: string } }
+  | { ok: false; status: 401 | 403 | 404; error: string; user?: User };
 
 /**
  * Mesma regra do /api/embed-url: sessão válida, página ativa e permissão
@@ -21,9 +21,9 @@ export async function checkPageAccess(slug: string): Promise<PageAccess> {
     const page = demoGetPageBySlug(slug);
     if (!page || !page.is_active) return { ok: false, status: 404, error: "Página não encontrada" };
     if (!isAdmin && !demoHasPermission(session.user.id, page.id)) {
-      return { ok: false, status: 403, error: "Sem permissão" };
+      return { ok: false, status: 403, error: "Sem permissão", user: session.user };
     }
-    return { ok: true, user: session.user, page: { id: page.id, label: page.label } };
+    return { ok: true, user: session.user, isAdmin, page: { id: page.id, label: page.label } };
   }
 
   const admin = createAdminClient();
@@ -40,8 +40,8 @@ export async function checkPageAccess(slug: string): Promise<PageAccess> {
       .select("id", { count: "exact", head: true })
       .eq("user_id", session.user.id)
       .eq("page_id", page.id);
-    if (!count) return { ok: false, status: 403, error: "Sem permissão" };
+    if (!count) return { ok: false, status: 403, error: "Sem permissão", user: session.user };
   }
 
-  return { ok: true, user: session.user, page: { id: page.id, label: page.label } };
+  return { ok: true, user: session.user, isAdmin, page: { id: page.id, label: page.label } };
 }

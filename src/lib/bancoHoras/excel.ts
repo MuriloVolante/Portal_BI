@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { APP_TIME_ZONE } from "@/lib/utils";
-import type { BancoHorasFilters } from "./filters";
+import { describeFilters, type BancoHorasFilters } from "./filters";
 import type { BancoHorasRow } from "./source";
 
 const HEADER_FILL = "FF2D2D2D";
@@ -14,14 +14,6 @@ interface BuildOptions {
   filters: BancoHorasFilters;
   generatedBy: string;
   truncated: boolean;
-}
-
-function formatFilters(filters: BancoHorasFilters) {
-  const parts = [
-    `Gerência: ${filters.gerencia ?? "todas"}`,
-    `Saldo mínimo: ${filters.saldoMin === null ? "sem mínimo" : `${filters.saldoMin.toLocaleString("pt-BR")} h`}`,
-  ];
-  return parts.join("   ·   ");
 }
 
 /** Planilha com cabeçalho de contexto (filtros, data, quem gerou) + tabela filtrável. */
@@ -53,7 +45,7 @@ export async function buildBancoHorasWorkbook({
   ws.getCell(1, 1).value = "Banco de Horas";
   ws.getCell(1, 1).font = { bold: true, size: 14 };
   ws.mergeCells(2, 1, 2, lastCol);
-  ws.getCell(2, 1).value = formatFilters(filters);
+  ws.getCell(2, 1).value = `Filtros: ${describeFilters(filters)}`;
   ws.getCell(2, 1).font = { color: { argb: "FF595959" } };
   ws.mergeCells(3, 1, 3, lastCol);
   ws.getCell(3, 1).value =
