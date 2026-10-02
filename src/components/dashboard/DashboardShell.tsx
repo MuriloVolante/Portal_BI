@@ -11,6 +11,8 @@ interface DashboardShellProps {
   slug: string;
   /** Nome do painel (null se o slug não existir). */
   label: string | null;
+  /** false quando o painel está aberto em segundo plano (PanelHost). */
+  active?: boolean;
 }
 
 type ShellState =
@@ -34,7 +36,7 @@ function timeNow() {
  * Busca a URL de embed no servidor (/api/embed-url) e mostra o relatório
  * dentro da moldura (cabeçalho fino + iframe).
  */
-export function DashboardShell({ slug, label }: DashboardShellProps) {
+export function DashboardShell({ slug, label, active = true }: DashboardShellProps) {
   const [state, setState] = useState<ShellState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
@@ -42,6 +44,17 @@ export function DashboardShell({ slug, label }: DashboardShellProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
+  const wasActive = useRef(active);
+
+  // Voltar para um painel que ficou aberto também conta como acesso (mesma
+  // regra de antes, quando cada abertura recarregava o painel). A rota
+  // registra o acesso; a URL devolvida é ignorada.
+  useEffect(() => {
+    if (active && !wasActive.current) {
+      fetch(`/api/embed-url?pageSlug=${encodeURIComponent(slug)}`).catch(() => undefined);
+    }
+    wasActive.current = active;
+  }, [active, slug]);
 
   useEffect(() => {
     let cancelled = false;
