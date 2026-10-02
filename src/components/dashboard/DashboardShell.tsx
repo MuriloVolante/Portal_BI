@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2, RotateCw } from "lucide-react";
+import { FileSpreadsheet, Maximize2, Minimize2, RotateCw } from "lucide-react";
 import { PowerBIFrame } from "./PowerBIFrame";
+import { ExportBancoHorasDialog } from "./ExportBancoHorasDialog";
 import { ReportSkeleton } from "./ReportSkeleton";
 import { ForbiddenState, LoadErrorState } from "@/components/empty/states";
 import { APP_TIME_ZONE } from "@/lib/utils";
+import { BANCO_HORAS_SLUG } from "@/lib/bancoHoras/filters";
 
 interface DashboardShellProps {
   slug: string;
@@ -41,6 +43,7 @@ export function DashboardShell({ slug, label }: DashboardShellProps) {
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -107,6 +110,23 @@ export function DashboardShell({ slug, label }: DashboardShellProps) {
           </span>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          {slug === BANCO_HORAS_SLUG && (
+            <button
+              type="button"
+              onClick={() => {
+                // O modal abre fora da moldura: em tela cheia ficaria invisível.
+                if (document.fullscreenElement) document.exitFullscreen();
+                setExportOpen(true);
+              }}
+              disabled={state.status !== "ready"}
+              title="Exportar para Excel"
+              className="mr-1.5 flex h-8 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/[.08] px-2.5 text-[12.5px] font-medium text-primary transition-colors [transition-duration:200ms] hover:bg-primary/[.16] active:scale-[.975] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">Exportar</span>
+              <span className="sr-only sm:hidden">Exportar para Excel</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={reload}
@@ -138,6 +158,8 @@ export function DashboardShell({ slug, label }: DashboardShellProps) {
           <ReportSkeleton />
         )}
       </div>
+
+      {slug === BANCO_HORAS_SLUG && <ExportBancoHorasDialog open={exportOpen} onOpenChange={setExportOpen} />}
     </div>
   );
 }
