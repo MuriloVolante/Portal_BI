@@ -3,19 +3,25 @@ import { DEMO_USERS, demoCountPermissions, demoLastSeen, isDemoMode } from "@/li
 import { UserTable } from "@/components/admin/UserTable";
 import { CreateUserDialog } from "@/components/admin/CreateUserDialog";
 import { PageHeader } from "@/components/admin/PageHeader";
+import type { User } from "@supabase/supabase-js";
 import type { AdminUserRow, Role } from "@/types";
 
 export const dynamic = "force-dynamic";
 
-const PER_PAGE = 10;
-
-interface UsersPageProps {
-  searchParams: { page?: string };
+/** Todos os usuários do Auth (a tabela ordena e pagina no navegador). */
+async function listAllAuthUsers(admin: ReturnType<typeof createAdminClient>) {
+  const all: User[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`listUsers falhou: ${error.message}`);
+    const users = data?.users ?? [];
+    all.push(...users);
+    if (users.length < 1000) break;
+  }
+  return all;
 }
 
-export default async function UsersPage({ searchParams }: UsersPageProps) {
-  const currentPage = Math.max(1, Number(searchParams.page) || 1);
-
+export default async function UsersPage() {
   if (isDemoMode) {
     const rows: AdminUserRow[] = DEMO_USERS.map((u) => ({
       id: u.id,
@@ -36,19 +42,14 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           description="Gerencie quem acessa o portal e suas permissões."
           actions={<CreateUserDialog />}
         />
-        <UserTable rows={rows} currentPage={1} hasNextPage={false} />
+        <UserTable rows={rows} />
       </div>
     );
   }
 
   const admin = createAdminClient();
 
-  const { data: usersData } = await admin.auth.admin.listUsers({
-    page: currentPage,
-    perPage: PER_PAGE,
-  });
-
-  const users = usersData?.users ?? [];
+  const users = await listAllAuthUsers(admin);
   const ids = users.map((u) => u.id);
 
   const [{ data: profiles }, { data: permissions }] = await Promise.all([
@@ -102,11 +103,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         actions={<CreateUserDialog />}
       />
 
-      <UserTable
-        rows={rows}
-        currentPage={currentPage}
-        hasNextPage={users.length === PER_PAGE}
-      />
+      <UserTable rows={rows} />
     </div>
   );
 }
