@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, FileSpreadsheet, FileStack, LayoutGrid, Users, type LucideIcon } from "lucide-react";
+import { ArrowLeft, FileStack, LayoutGrid, Users, type LucideIcon } from "lucide-react";
 import { NavList, type NavItem } from "@/components/sidebar/SidebarNavItem";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,6 @@ const SECTIONS: NavItem[] = [
   { href: "/admin", label: "Visão geral", icon: LayoutGrid },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/paginas", label: "Páginas", icon: FileStack },
-  { href: "/admin/banco-horas", label: "Exportações", icon: FileSpreadsheet },
 ];
 
 function activeSection(pathname: string): string | null {
@@ -28,7 +27,6 @@ const TABS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Geral", icon: LayoutGrid },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/paginas", label: "Páginas", icon: FileStack },
-  { href: "/admin/banco-horas", label: "Exportar", icon: FileSpreadsheet },
   { href: "/", label: "Portal", icon: ArrowLeft },
 ];
 
@@ -42,7 +40,7 @@ export function AdminTabBar() {
       aria-label="Administração"
       className="fixed inset-x-0 bottom-0 z-40 box-content h-[62px] border-t bg-[rgb(38_38_38/.94)] pb-[env(safe-area-inset-bottom)] backdrop-blur-[12px] md:hidden"
     >
-      <div className="grid h-full grid-cols-5">
+      <div className="grid h-full grid-cols-4">
         {TABS.map(({ href, label, icon: Icon }) => {
           const isActive = href === active;
           return (

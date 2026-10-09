@@ -113,16 +113,6 @@ function createInitialStore(): DemoStore {
       created_at: "2026-01-01T12:00:00Z",
       embed_url: DEMO_EMBED_URL,
     },
-    {
-      id: "00000000-0000-0000-0000-000000000a04",
-      slug: "banco-horas",
-      label: "Banco de Horas",
-      icon: "Clock",
-      order: 4,
-      is_active: true,
-      created_at: "2026-01-01T12:00:00Z",
-      embed_url: DEMO_EMBED_URL,
-    },
   ];
 
   const [, user, carlos, juliana, , rafael] = DEMO_USERS;
@@ -131,7 +121,6 @@ function createInitialStore(): DemoStore {
     permissions: new Set([
       `${user.id}:${pages[0].id}`,
       `${user.id}:${pages[1].id}`,
-      `${user.id}:${pages[3].id}`,
       `${carlos.id}:${pages[0].id}`,
       `${carlos.id}:${pages[2].id}`,
       `${juliana.id}:${pages[1].id}`,
