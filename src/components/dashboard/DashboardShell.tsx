@@ -155,7 +155,13 @@ export function DashboardShell({ slug, label, active = true, initialEmbedUrl, on
 
       <div className="min-h-0 flex-1">
         {state.status === "ready" ? (
-          <PowerBIFrame key={reloadKey} src={state.embedUrl} title={name} onLoaded={handleLoaded} active={active} />
+          <PowerBIFrame
+            src={state.embedUrl}
+            title={name}
+            onLoaded={handleLoaded}
+            active={active}
+            reloadToken={reloadKey}
+          />
         ) : (
           <ReportSkeleton />
         )}
