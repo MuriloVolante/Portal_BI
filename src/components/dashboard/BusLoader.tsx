@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 /**
  * Tela de carregamento do painel: um ônibus percorrendo a cidade e parando
@@ -342,6 +342,24 @@ function BusStop({ x, stop }: { x: number; stop: Stop }) {
   );
 }
 
+/** Pintura inspirada na frota: verde-limão com setas grafite/prata e frisos brancos. */
+const PAINT = {
+  green: "#86C440",
+  greenLight: "#9BD456",
+  greenDark: "#6EA632",
+  graphite: "#3A3A3A",
+  silver: "#A3A3A3",
+  white: "#F4F4F4",
+  glass: "#232A26",
+  mask: "#1B1B1B",
+};
+
+/** Seta "<" da faixa inferior, com ponta em (tipX) e topo/base em x + depth. */
+function chevron(x: number, depth: number, top: number, bottom: number) {
+  const mid = (top + bottom) / 2;
+  return `${x + depth},${top} ${x},${mid} ${x + depth},${bottom}`;
+}
+
 function Bus({
   wheelRefs,
   doorRefs,
@@ -349,76 +367,106 @@ function Bus({
   wheelRefs: React.MutableRefObject<(SVGGElement | null)[]>;
   doorRefs: React.MutableRefObject<(SVGRectElement | null)[]>;
 }) {
+  const clipId = `bus-body${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const W = BUS_W;
   // Origem: traseira do ônibus, no chão. Desenhado virado para a direita.
+  const body = `M4,-12 L4,-50 Q4,-58 12,-58 L${W - 16},-58 Q${W - 3},-58 ${W},-45 L${W},-14 Q${W},-10 ${W - 4},-10 L8,-10 Q4,-10 4,-12 Z`;
+  const TOP = -33; // faixa inferior (setas), da janela até a saia
+  const BOTTOM = -14;
+  const D = 12; // profundidade das setas
+  const MID = (TOP + BOTTOM) / 2;
+  const wheelsX = [34, W - 38];
+
   return (
     <g>
-      <ellipse cx={BUS_W / 2} cy="1" rx={BUS_W / 2 + 4} ry="4" fill="#000" opacity="0.28" />
+      <ellipse cx={W / 2} cy="1" rx={W / 2 + 4} ry="4" fill="#000" opacity="0.28" />
       {/* farol no chão */}
-      <polygon points={`${BUS_W},-14 ${BUS_W + 90},-2 ${BUS_W + 90},4 ${BUS_W},-8`} fill="url(#bus-beam)" />
+      <polygon points={`${W},-14 ${W + 90},-2 ${W + 90},4 ${W},-8`} fill="url(#bus-beam)" />
 
-      {/* carroceria */}
-      <path
-        d={`M6,-12 L6,-52 Q6,-58 12,-58 L${BUS_W - 14},-58 Q${BUS_W - 2},-58 ${BUS_W},-46 L${BUS_W},-14 Q${BUS_W},-10 ${BUS_W - 4},-10 L10,-10 Q6,-10 6,-12 Z`}
-        fill="#ECECEC"
-      />
-      {/* faixa lima e saia */}
-      <rect x="6" y="-24" width={BUS_W - 6} height="5" fill={LIME} />
-      <rect x="6" y="-19" width={BUS_W - 6} height="7" fill="#D6D6D6" />
-      {/* janelas */}
-      {Array.from({ length: 4 }, (_, i) => (
-        <g key={i}>
-          <rect x={14 + i * 21} y="-50" width="17" height="18" rx="2.5" fill="#262626" />
-          <rect x={16 + i * 21} y="-48" width="4" height="14" rx="1" fill={CYAN} opacity="0.35" />
-        </g>
+      {/* ar-condicionado no teto */}
+      <rect x="34" y="-62" width="46" height="5" rx="2" fill={PAINT.greenLight} />
+      <rect x="96" y="-61" width="26" height="4" rx="2" fill={PAINT.greenLight} />
+
+      <clipPath id={clipId}>
+        <path d={body} />
+      </clipPath>
+      <g clipPath={`url(#${clipId})`}>
+        <rect x="0" y="-60" width={W + 2} height="52" fill={PAINT.green} />
+        <rect x="0" y="-58" width={W + 2} height="3" fill={PAINT.greenLight} />
+
+        {/* faixa inferior: seta prata e seta grafite contornadas de branco,
+            e o painel grafite seguindo até a porta */}
+        <polygon points={`20,${TOP} 46,${TOP} ${46 - D},${MID} 46,${BOTTOM} 20,${BOTTOM} ${20 - D},${MID}`} fill={PAINT.silver} />
+        <polygon points={`46,${TOP} ${DOOR_X - 11},${TOP} ${DOOR_X - 11},${BOTTOM} 46,${BOTTOM} ${46 - D},${MID}`} fill={PAINT.graphite} />
+        {[20, 46, 72].map((x) => (
+          <polyline key={x} points={chevron(x - D, D, TOP, BOTTOM)} fill="none" stroke={PAINT.white} strokeWidth="2" strokeLinejoin="round" />
+        ))}
+        {/* frente: painel grafite com seta branca */}
+        <polygon points={`${W - 22},-24 ${W - 5},-24 ${W - 5},-17 ${W - 22},-17 ${W - 26},-20.5`} fill={PAINT.graphite} />
+        <polyline points={chevron(W - 26, 4, -24, -17)} fill="none" stroke={PAINT.white} strokeWidth="1.4" strokeLinejoin="round" />
+
+        {/* saia */}
+        <rect x="0" y="-14" width={W + 2} height="4" fill={PAINT.greenDark} />
+
+        {/* janelas contínuas com colunas */}
+        <rect x="8" y="-52" width={W - 46} height="19" rx="2" fill={PAINT.glass} />
+        {[30, 52, 74, 96].map((x) => (
+          <rect key={x} x={x} y="-52" width="2" height="19" fill="#151A17" />
+        ))}
+        <rect x="11" y="-50" width="5" height="15" rx="1" fill={CYAN} opacity="0.22" />
+        <rect x="56" y="-50" width="5" height="15" rx="1" fill={CYAN} opacity="0.18" />
+
+        {/* máscara preta da frente e para-brisa */}
+        <path d={`M${W - 34},-58 L${W - 16},-58 Q${W - 3},-58 ${W},-45 L${W},-27 L${W - 34},-27 Z`} fill={PAINT.mask} />
+        <path d={`M${W - 30},-52 L${W - 14},-52 Q${W - 6},-51 ${W - 4},-43 L${W - 4},-31 L${W - 30},-31 Z`} fill={PAINT.glass} />
+        <rect x={W - 26} y="-50" width="4" height="16" rx="1" fill={CYAN} opacity="0.3" />
+        {/* letreiro lateral */}
+        <rect x={W - 82} y="-57" width="44" height="5" rx="1.5" fill={PAINT.mask} />
+        <text x={W - 60} y="-53.1" textAnchor="middle" fontSize="4.6" fontWeight="700" letterSpacing="0.8" fill="#EDEDED">
+          PORTAL BI
+        </text>
+      </g>
+
+      {/* porta: moldura verde, folhas de vidro que abrem nos pontos */}
+      <rect x={DOOR_X - 10} y="-52" width="20" height="41" rx="2" fill={PAINT.greenDark} />
+      <rect x={DOOR_X - 9} y="-51" width="18" height="39" rx="1.5" fill="#151A17" />
+      {[0, 1].map((i) => (
+        <rect
+          key={i}
+          ref={(el) => {
+            doorRefs.current[i] = el;
+          }}
+          x={i === 0 ? DOOR_X - 9 : DOOR_X}
+          y="-51"
+          width="9"
+          height="39"
+          rx="1.5"
+          fill={PAINT.glass}
+          stroke={PAINT.green}
+          strokeWidth="1"
+        />
       ))}
-      {/* porta (duas folhas que abrem) */}
-      <rect x={DOOR_X - 9} y="-50" width="18" height="38" rx="2" fill="#1F1F1F" />
-      <rect
-        ref={(el) => {
-          doorRefs.current[0] = el;
-        }}
-        x={DOOR_X - 9}
-        y="-50"
-        width="9"
-        height="38"
-        rx="1.5"
-        fill="#2F2F2F"
-        stroke="#3F3F3F"
-      />
-      <rect
-        ref={(el) => {
-          doorRefs.current[1] = el;
-        }}
-        x={DOOR_X}
-        y="-50"
-        width="9"
-        height="38"
-        rx="1.5"
-        fill="#2F2F2F"
-        stroke="#3F3F3F"
-      />
-      {/* para-brisa e letreiro */}
-      <path d={`M${BUS_W - 30},-50 L${BUS_W - 12},-50 Q${BUS_W - 4},-49 ${BUS_W - 3},-40 L${BUS_W - 3},-28 L${BUS_W - 30},-28 Z`} fill="#262626" />
-      <rect x={BUS_W - 27} y="-48" width="4" height="16" rx="1" fill={CYAN} opacity="0.35" />
-      <rect x="18" y="-57" width="70" height="6" rx="1.5" fill="#262626" />
-      <text x="53" y="-52.3" textAnchor="middle" fontSize="5" fontWeight="700" letterSpacing="0.8" fill={LIME}>
-        PORTAL BI
-      </text>
-      {/* luzes */}
-      <circle cx={BUS_W - 2} cy="-17" r="2.6" fill="#FFE27A" />
-      <rect x="6" y="-22" width="3" height="6" rx="1" fill="#E5484D" />
-      {/* rodas */}
-      {[34, BUS_W - 38].map((cx, i) => (
+
+      {/* retrovisor, luzes */}
+      <path d={`M${W - 1},-48 L${W + 5},-46 L${W + 5},-38`} fill="none" stroke={PAINT.mask} strokeWidth="2" strokeLinecap="round" />
+      <circle cx={W - 2} cy="-19" r="2.6" fill="#FFF6D0" />
+      <rect x="4" y="-28" width="3" height="9" rx="1" fill="#E5484D" />
+
+      {/* caixas de roda e rodas */}
+      {wheelsX.map((cx, i) => (
         <g key={cx} transform={`translate(${cx} -9)`}>
-          <circle r="10" fill="#1A1A1A" stroke="#3A3A3A" strokeWidth="2" />
+          <path d="M-13,-1 A13,13 0 0 1 13,-1 Z" fill="#141414" />
+          <circle r="10" fill="#161616" stroke="#2E2E2E" strokeWidth="1.5" />
           <g
             ref={(el) => {
               wheelRefs.current[i] = el;
             }}
           >
-            <circle r="4" fill="#A5A5A5" />
-            <rect x="-0.8" y="-7" width="1.6" height="14" fill="#7A7A7A" />
-            <rect x="-7" y="-0.8" width="14" height="1.6" fill="#7A7A7A" />
+            <circle r="5.2" fill="#BDBDBD" />
+            <circle r="2" fill="#7A7A7A" />
+            {[0, 60, 120].map((a) => (
+              <rect key={a} x="-0.7" y="-5" width="1.4" height="10" fill="#8F8F8F" transform={`rotate(${a})`} />
+            ))}
           </g>
         </g>
       ))}
