@@ -284,7 +284,7 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
   const stopX = (k: number) => busLeft + DOOR_X + k * spacing;
 
   return (
-    <div ref={wrapRef} className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden px-4">
+    <div ref={wrapRef} className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden">
       <div ref={backdropRef} className="absolute inset-0 bg-background" style={{ opacity: intro ? 0 : 1 }} />
       <svg
         width="100%"
@@ -395,7 +395,7 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
         />
       </svg>
 
-      <div ref={captionRef} className="relative" style={{ opacity: intro ? 0 : 1 }}>
+      <div ref={captionRef} className="relative px-4" style={{ opacity: intro ? 0 : 1 }}>
         <p key={caption} className="mt-2 min-h-[22px] animate-rise-in text-center text-[15px] text-foreground/90" aria-live="polite">
           {caption}
         </p>
