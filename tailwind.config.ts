@@ -81,6 +81,10 @@ const config: Config = {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "cover-in": {
+          from: { opacity: "0", backdropFilter: "blur(0)" },
+          to: { opacity: "1", backdropFilter: "blur(8px)" },
+        },
         "bar-grow": {
           from: { transform: "scaleY(0)" },
           to: { transform: "scaleY(1)" },
@@ -98,6 +102,7 @@ const config: Config = {
         "sheet-in": "sheet-in .45s cubic-bezier(.22,1,.36,1) both",
         "modal-in": "modal-in .45s cubic-bezier(.22,1,.36,1) both",
         "scrim-in": "scrim-in .25s cubic-bezier(.4,0,.2,1) both",
+        "cover-in": "cover-in .45s cubic-bezier(.4,0,.2,1) both",
         shimmer: "shimmer 1.5s infinite",
         float: "float 5.5s ease-in-out infinite",
       },
