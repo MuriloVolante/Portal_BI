@@ -19,9 +19,9 @@ const POWER_BI_FOOTER_CROP_PX = 72;
  * Power BI já está em cache e volta mais rápido.
  */
 const SETTLE_FIRST_MS = 4000;
-const SETTLE_RELOAD_MS = 2000;
-/** Tempo da tela do ônibus surgindo por cima do relatório ao recarregar. */
-const COVER_MS = 450;
+const SETTLE_RELOAD_MS = 3500;
+/** Se a entrada do recarregar não avisar que cobriu a tela, segue assim mesmo. */
+const COVER_FALLBACK_MS = 3000;
 
 declare global {
   interface Window {
@@ -41,7 +41,8 @@ interface PowerBIFrameProps {
 }
 
 /**
- * covering (só no recarregar): a tela do ônibus surge por cima do relatório →
+ * covering (só no recarregar): o ônibus entra sobre o relatório e a cidade
+ * aparece em volta até cobrir tudo →
  * loading → (load) settling: espera o Power BI terminar de desenhar →
  * arriving: ônibus parte → fading: tela some → done
  */
@@ -66,21 +67,32 @@ export function PowerBIFrame({ src, title, onLoaded, active = true, reloadToken 
     if (frame && window.__loadedFrames?.has(frame)) handleLoad();
   }, [handleLoad]);
 
-  // Recarregar: primeiro cobre o relatório com a animação, depois recarrega
-  // o iframe (assim não aparece o branco do Power BI reiniciando).
+  // Recarregar: primeiro a entrada do ônibus cobre o relatório (BusLoader
+  // avisa em onCovered), depois o iframe recarrega por baixo — assim a tela
+  // branca do Power BI reiniciando nunca aparece.
   const firstToken = useRef(reloadToken);
   useEffect(() => {
     if (reloadToken === firstToken.current) return;
     firstToken.current = reloadToken;
     setCycle((c) => c + 1);
     setPhase("covering");
-    const t = setTimeout(() => {
-      setPhase("loading");
-      const frame = iframeRef.current;
-      if (frame) frame.src = src; // reatribuir o mesmo endereço recarrega o iframe
-    }, COVER_MS);
+  }, [reloadToken]);
+
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const startReload = useCallback(() => {
+    if (phaseRef.current !== "covering") return;
+    phaseRef.current = "loading";
+    const frame = iframeRef.current;
+    if (frame) frame.src = src; // reatribuir o mesmo endereço recarrega o iframe
+    setPhase("loading");
+  }, [src]);
+
+  useEffect(() => {
+    if (phase !== "covering") return;
+    const t = setTimeout(startReload, COVER_FALLBACK_MS);
     return () => clearTimeout(t);
-  }, [reloadToken, src]);
+  }, [phase, startReload]);
 
   useEffect(() => {
     if (phase !== "settling") return;
@@ -115,18 +127,19 @@ export function PowerBIFrame({ src, title, onLoaded, active = true, reloadToken 
         <div
           key={cycle}
           className={cn(
-            "absolute inset-0 z-10 bg-background transition-opacity [transition-duration:300ms]",
-            isReload && "animate-cover-in",
+            "absolute inset-0 z-10 transition-opacity [transition-duration:300ms]",
+            // No recarregar o fundo é do próprio BusLoader (começa transparente).
+            !isReload && "bg-background",
             phase === "fading" && "opacity-0"
           )}
         >
-          <div className={cn("h-full", isReload && "animate-view-in [animation-delay:120ms]")}>
-            <BusLoader
-              arriving={phase === "arriving" || phase === "fading"}
-              paused={!active}
-              onDone={() => setPhase((p) => (p === "arriving" ? "fading" : p))}
-            />
-          </div>
+          <BusLoader
+            arriving={phase === "arriving" || phase === "fading"}
+            paused={!active}
+            intro={isReload}
+            onCovered={startReload}
+            onDone={() => setPhase((p) => (p === "arriving" ? "fading" : p))}
+          />
         </div>
       )}
       <iframe
