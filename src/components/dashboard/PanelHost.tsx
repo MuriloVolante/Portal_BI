@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { DashboardShell } from "./DashboardShell";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,18 @@ import type { SidebarPage } from "@/types";
 
 /** Quantos painéis ficam abertos em segundo plano (o menos usado sai). */
 const MAX_KEPT = 4;
+/** Espera depois que o painel visível carrega, antes de pré-carregar o próximo. */
+const PRELOAD_DELAY_MS = 1500;
+
+/**
+ * Pré-carregar outros painéis só em computador com conexão boa: no celular
+ * gastaria dados e bateria com relatórios que talvez nem sejam abertos.
+ */
+function canPreload() {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData || (conn?.effectiveType && /(^|-)2g|3g/.test(conn.effectiveType))) return false;
+  return window.matchMedia("(min-width: 768px) and (pointer: fine)").matches;
+}
 
 function slugFromPath(pathname: string) {
   const match = /^\/dashboard\/([^/]+)\/?$/.exec(pathname);
@@ -22,7 +34,14 @@ function slugFromPath(pathname: string) {
  * Os painéis ficam sempre na mesma ordem no DOM — mover um iframe de lugar
  * faz o navegador recarregá-lo.
  */
-export function PanelHost({ pages, children }: { pages: SidebarPage[]; children: React.ReactNode }) {
+interface PanelHostProps {
+  pages: SidebarPage[];
+  /** slug → link do Power BI, já no HTML (o iframe nasce carregando). */
+  embedUrls: Record<string, string>;
+  children: React.ReactNode;
+}
+
+export function PanelHost({ pages, embedUrls, children }: PanelHostProps) {
   const pathname = usePathname();
   const slug = slugFromPath(pathname);
   const activeSlug = slug && pages.some((p) => p.slug === slug) ? slug : null;
@@ -44,6 +63,23 @@ export function PanelHost({ pages, children }: { pages: SidebarPage[]; children:
     });
   }, [activeSlug]);
 
+  // Pré-carregamento: quando um painel termina de carregar, o próximo painel
+  // liberado (ainda não aberto) começa a carregar escondido, um por vez.
+  const [readyCount, setReadyCount] = useState(0);
+  const handleReady = useCallback(() => setReadyCount((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!readyCount || !activeSlug || !canPreload()) return;
+    const t = setTimeout(() => {
+      setKept((prev) => {
+        if (prev.length >= MAX_KEPT) return prev;
+        const next = pages.find((p) => !prev.includes(p.slug) && embedUrls[p.slug]);
+        return next ? [...prev, next.slug] : prev;
+      });
+    }, PRELOAD_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [readyCount, activeSlug, pages, embedUrls]);
+
   // Painel recém-aberto entra já neste render (sem esperar o efeito), e quem
   // perdeu a permissão sai da pilha.
   const rendered = (activeSlug && !kept.includes(activeSlug) ? [...kept, activeSlug] : kept).filter((s) =>
@@ -64,7 +100,13 @@ export function PanelHost({ pages, children }: { pages: SidebarPage[]; children:
               isActive ? "visible opacity-100" : "pointer-events-none invisible opacity-0"
             )}
           >
-            <DashboardShell slug={s} label={pages.find((p) => p.slug === s)!.label} active={isActive} />
+            <DashboardShell
+              slug={s}
+              label={pages.find((p) => p.slug === s)!.label}
+              active={isActive}
+              initialEmbedUrl={embedUrls[s]}
+              onReady={handleReady}
+            />
           </div>
         );
       })}
