@@ -12,6 +12,13 @@ import { cn } from "@/lib/utils";
  */
 const POWER_BI_FOOTER_CROP_PX = 72;
 
+/**
+ * O "load" do iframe chega quando a página do Power BI abre, mas ele ainda
+ * passa alguns segundos na própria tela de "Carregando dados…". A animação
+ * espera mais este tempo antes de revelar o relatório.
+ */
+const SETTLE_MS = 4000;
+
 declare global {
   interface Window {
     /** Iframes que já dispararam "load" (registrado no <head>, antes do React). */
@@ -27,8 +34,11 @@ interface PowerBIFrameProps {
   active?: boolean;
 }
 
-/** loading → (load) arriving: ônibus parte → fading: tela some → done */
-type Phase = "loading" | "arriving" | "fading" | "done";
+/**
+ * loading → (load) settling: espera o Power BI terminar de desenhar →
+ * arriving: ônibus parte → fading: tela some → done
+ */
+type Phase = "loading" | "settling" | "arriving" | "fading" | "done";
 
 export function PowerBIFrame({ src, title, onLoaded, active = true }: PowerBIFrameProps) {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -36,12 +46,22 @@ export function PowerBIFrame({ src, title, onLoaded, active = true }: PowerBIFra
   const notified = useRef(false);
 
   const handleLoad = useCallback(() => {
-    setPhase((p) => (p === "loading" ? "arriving" : p));
-    if (!notified.current) {
-      notified.current = true;
-      onLoaded?.();
-    }
-  }, [onLoaded]);
+    setPhase((p) => (p === "loading" ? "settling" : p));
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "settling") return;
+    const t = setTimeout(() => {
+      setPhase("arriving");
+      // Só agora conta como carregado: libera o "aberto às" e o
+      // pré-carregamento dos outros painéis (que não disputa mais a rede).
+      if (!notified.current) {
+        notified.current = true;
+        onLoaded?.();
+      }
+    }, SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [phase, onLoaded]);
 
   // O iframe vem no HTML do servidor e pode ter carregado antes do React
   // assumir a página: nesse caso o onLoad não dispara, então conferimos.
@@ -73,7 +93,7 @@ export function PowerBIFrame({ src, title, onLoaded, active = true }: PowerBIFra
           )}
         >
           <BusLoader
-            arriving={phase !== "loading"}
+            arriving={phase === "arriving" || phase === "fading"}
             paused={!active}
             onDone={() => setPhase((p) => (p === "arriving" ? "fading" : p))}
           />
