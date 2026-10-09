@@ -13,6 +13,10 @@ interface DashboardShellProps {
   label: string | null;
   /** false quando o painel está aberto em segundo plano (PanelHost). */
   active?: boolean;
+  /** Link já entregue pelo servidor no HTML: o iframe nasce carregando. */
+  initialEmbedUrl?: string;
+  /** Avisa o PanelHost que o relatório terminou de carregar. */
+  onReady?: (slug: string) => void;
 }
 
 type ShellState =
@@ -36,27 +40,29 @@ function timeNow() {
  * Busca a URL de embed no servidor (/api/embed-url) e mostra o relatório
  * dentro da moldura (cabeçalho fino + iframe).
  */
-export function DashboardShell({ slug, label, active = true }: DashboardShellProps) {
-  const [state, setState] = useState<ShellState>({ status: "loading" });
+export function DashboardShell({ slug, label, active = true, initialEmbedUrl, onReady }: DashboardShellProps) {
+  const [state, setState] = useState<ShellState>(
+    initialEmbedUrl ? { status: "ready", embedUrl: initialEmbedUrl } : { status: "loading" }
+  );
   const [attempt, setAttempt] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
-  const wasActive = useRef(active);
 
-  // Voltar para um painel que ficou aberto também conta como acesso (mesma
-  // regra de antes, quando cada abertura recarregava o painel). A rota
-  // registra o acesso; a URL devolvida é ignorada.
+  // Registro de acesso: cada vez que o painel fica visível (primeira abertura
+  // ou volta a um painel que ficou aberto). Painel pré-carregado em segundo
+  // plano só conta quando a pessoa abre. Não segura o iframe: roda em paralelo.
   useEffect(() => {
-    if (active && !wasActive.current) {
-      fetch(`/api/embed-url?pageSlug=${encodeURIComponent(slug)}`).catch(() => undefined);
-    }
-    wasActive.current = active;
-  }, [active, slug]);
+    if (!active || !initialEmbedUrl) return;
+    fetch(`/api/embed-url?pageSlug=${encodeURIComponent(slug)}`).catch(() => undefined);
+  }, [active, slug, initialEmbedUrl]);
 
+  // Sem link no HTML (caso raro): busca na API, como antes. Essa chamada já
+  // registra o acesso.
   useEffect(() => {
+    if (initialEmbedUrl && attempt === 0) return;
     let cancelled = false;
     setState({ status: "loading" });
     setOpenedAt(null);
@@ -82,7 +88,7 @@ export function DashboardShell({ slug, label, active = true }: DashboardShellPro
     return () => {
       cancelled = true;
     };
-  }, [slug, attempt]);
+  }, [slug, attempt, initialEmbedUrl]);
 
   useEffect(() => {
     // O iPhone não permite tela cheia de elementos comuns: escondemos o botão.
@@ -92,7 +98,10 @@ export function DashboardShell({ slug, label, active = true }: DashboardShellPro
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const handleLoaded = useCallback(() => setOpenedAt(timeNow()), []);
+  const handleLoaded = useCallback(() => {
+    setOpenedAt(timeNow());
+    onReady?.(slug);
+  }, [onReady, slug]);
 
   function reload() {
     setOpenedAt(null);
@@ -146,7 +155,7 @@ export function DashboardShell({ slug, label, active = true }: DashboardShellPro
 
       <div className="min-h-0 flex-1">
         {state.status === "ready" ? (
-          <PowerBIFrame key={reloadKey} src={state.embedUrl} title={name} onLoaded={handleLoaded} />
+          <PowerBIFrame key={reloadKey} src={state.embedUrl} title={name} onLoaded={handleLoaded} active={active} />
         ) : (
           <ReportSkeleton />
         )}

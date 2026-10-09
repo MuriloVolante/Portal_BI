@@ -44,6 +44,17 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className="dark">
+      <head>
+        {/* O iframe do Power BI vem pronto no HTML e pode terminar de carregar
+            antes do React assumir a página (e o onLoad do React perderia o
+            evento). Este registro guarda quem já carregou. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.__loadedFrames=new WeakSet;document.addEventListener('load',function(e){var t=e.target;t&&t.tagName==='IFRAME'&&window.__loadedFrames.add(t)},true);",
+          }}
+        />
+      </head>
       <body className={cn("min-h-screen", display.variable, body.variable)}>
         {children}
       </body>

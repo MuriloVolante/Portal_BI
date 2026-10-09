@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { demoAllowedPages, demoGetPageBySlug, isDemoMode } from "@/lib/demo";
 import type { Role, SidebarPage } from "@/types";
 
@@ -51,4 +51,26 @@ export async function getPageLabel(slug: string): Promise<string | null> {
     .eq("slug", slug)
     .maybeSingle<{ label: string }>();
   return data?.label ?? null;
+}
+
+/**
+ * Links de embed das páginas que o usuário já pode ver (lista vinda de
+ * getAllowedPages). Vão no HTML da página para o iframe começar a carregar
+ * antes do JavaScript do portal — o usuário já tem permissão em todas, então
+ * não expõe nada além do que o /api/embed-url entregaria.
+ */
+export async function getEmbedUrls(pages: SidebarPage[]): Promise<Record<string, string>> {
+  if (!pages.length) return {};
+  if (isDemoMode) {
+    return Object.fromEntries(
+      pages.map((p) => [p.slug, demoGetPageBySlug(p.slug)?.embed_url ?? ""]).filter(([, url]) => url)
+    );
+  }
+
+  const { data } = await createAdminClient()
+    .from("pages")
+    .select("slug, embed_url")
+    .in("slug", pages.map((p) => p.slug))
+    .eq("is_active", true);
+  return Object.fromEntries((data ?? []).map((p) => [p.slug as string, p.embed_url as string]));
 }
