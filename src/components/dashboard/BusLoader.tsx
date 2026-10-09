@@ -26,11 +26,13 @@ const STOPS: Stop[] = [
 
 const HEIGHT = 210;
 const ROAD_Y = 158; // topo da pista
-const BUS_W = 168;
+/** O ônibus é desenhado em 385 × ~100 unidades e exibido nesta escala. */
+const BUS_SCALE = 0.6;
+const BUS_W = 385 * BUS_SCALE;
 const CRUISE = 150; // px/s
 const BRAKE_DIST = 130; // px antes do ponto em que começa a frear
 const DWELL_MS = 1100; // tempo parado com as portas abertas
-const DOOR_X = 118; // posição da porta a partir da traseira do ônibus
+const DOOR_X = 346 * BUS_SCALE; // porta da frente (a que para no ponto), a partir da traseira
 
 const LIME = "#96D737";
 const CYAN = "#2396B4";
@@ -76,7 +78,6 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [caption, setCaption] = useState(STOPS[0].caption);
-  const [honk, setHonk] = useState(0);
 
   // Elementos animados via ref (sem re-render a cada quadro).
   const skylineRef = useRef<SVGGElement>(null);
@@ -84,7 +85,7 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
   const stopsRef = useRef<SVGGElement>(null);
   const busRef = useRef<SVGGElement>(null);
   const wheelRefs = useRef<(SVGGElement | null)[]>([]);
-  const doorRefs = useRef<(SVGRectElement | null)[]>([]);
+  const doorRefs = useRef<(SVGGElement | null)[]>([]);
   const puffRefs = useRef<(SVGCircleElement | null)[]>([]);
   // Partes que aparecem depois do ônibus na entrada do recarregar.
   const sceneRef = useRef<SVGGElement>(null);
@@ -269,7 +270,8 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
       wheelRefs.current.forEach((w) => w?.setAttribute("transform", `rotate(${wheelAngle % 360})`));
       doorRefs.current.forEach((d, i) => {
         if (!d) return;
-        const shift = s.door * 7 * (i === 0 ? -1 : 1);
+        // folhas da porta da frente (medidas do desenho, antes da escala)
+        const shift = s.door * 11 * (i === 0 ? -1 : 1);
         d.setAttribute("transform", `translate(${shift} 0)`);
       });
 
@@ -364,21 +366,8 @@ export function BusLoader({ arriving, onDone, paused = false, intro = false, onC
 
         {/* ônibus */}
         <g ref={busRef} transform={`translate(${intro ? -BUS_W - 30 : busLeft} 0)`}>
-          <g
-            transform={`translate(0 ${ROAD_Y + 8})`}
-            onClick={() => setHonk((n) => n + 1)}
-            className="cursor-pointer"
-            style={{ pointerEvents: "auto" }}
-          >
+          <g transform={`translate(0 ${ROAD_Y + 8})`}>
             <Bus wheelRefs={wheelRefs} doorRefs={doorRefs} />
-            {honk > 0 && (
-              <g key={honk} className="animate-rise-in">
-                <rect x={BUS_W + 8} y="-52" width="58" height="22" rx="11" fill="#363636" stroke={LIME} strokeOpacity="0.6" />
-                <text x={BUS_W + 37} y="-37" textAnchor="middle" fontSize="11" fontWeight="600" fill={LIME}>
-                  Bi-bi!
-                </text>
-              </g>
-            )}
           </g>
         </g>
 
@@ -423,131 +412,160 @@ function BusStop({ x, stop }: { x: number; stop: Stop }) {
   );
 }
 
-/** Pintura inspirada na frota: verde-limão com setas grafite/prata e frisos brancos. */
+/** Pintura da frota (lateral direita do modelo Metropolitano). */
 const PAINT = {
-  green: "#86C440",
-  greenLight: "#9BD456",
-  greenDark: "#6EA632",
-  graphite: "#3A3A3A",
-  silver: "#A3A3A3",
-  white: "#F4F4F4",
-  glass: "#232A26",
-  mask: "#1B1B1B",
+  green: "#A8CF44",
+  greenDark: "#8DB534",
+  gray: "#A9B8C1",
+  graphite: "#4C4B4E",
+  white: "#FFFFFF",
+  band: "#0E0E0E",
 };
 
-/** Seta "<" da faixa inferior, com ponta em (tipX) e topo/base em x + depth. */
-function chevron(x: number, depth: number, top: number, bottom: number) {
-  const mid = (top + bottom) / 2;
-  return `${x + depth},${top} ${x},${mid} ${x + depth},${bottom}`;
-}
+// Medidas no desenho original (385 unidades de comprimento, chão em y = 0).
+const BODY_PATH =
+  "M4,-13 L2,-85 Q2,-93 10,-93 L352,-93 Q373,-93 379,-82 L385,-56 L385,-16 Q385,-13 382,-13 Z";
+const WINDOWS = [[12, 50], [90, 134], [137, 182], [224, 276], [279, 326]];
+const DOORS = [[54, 88], [185, 219], [332, 360]];
+const WHEELS = [128, 309];
+const ROOF_HATCHES = [[40, 66], [76, 86], [111, 121], [247, 269], [294, 304], [328, 338]];
+const RIM_BOLTS = Array.from({ length: 10 }, (_, k) => [Math.cos((k * Math.PI) / 5) * 6.6, Math.sin((k * Math.PI) / 5) * 6.6]);
+
+const pts = (points: number[][]) => points.map(([x, y]) => `${x},${y}`).join(" ");
+const diamond = (cx: number, cy: number, h: number) => pts([[cx, cy - h], [cx + h, cy], [cx, cy + h], [cx - h, cy]]);
 
 function Bus({
   wheelRefs,
   doorRefs,
 }: {
   wheelRefs: React.MutableRefObject<(SVGGElement | null)[]>;
-  doorRefs: React.MutableRefObject<(SVGRectElement | null)[]>;
+  doorRefs: React.MutableRefObject<(SVGGElement | null)[]>;
 }) {
-  const clipId = `bus-body${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const W = BUS_W;
-  // Origem: traseira do ônibus, no chão. Desenhado virado para a direita.
-  const body = `M4,-12 L4,-50 Q4,-58 12,-58 L${W - 16},-58 Q${W - 3},-58 ${W},-45 L${W},-14 Q${W},-10 ${W - 4},-10 L8,-10 Q4,-10 4,-12 Z`;
-  const TOP = -33; // faixa inferior (setas), da janela até a saia
-  const BOTTOM = -14;
-  const D = 12; // profundidade das setas
-  const MID = (TOP + BOTTOM) / 2;
-  const wheelsX = [34, W - 38];
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const bodyClip = `bus-body-${uid}`;
+  const clusterClip = `bus-cluster-${uid}`;
+  const glass = `bus-glass-${uid}`;
+  const [frontDoorStart, frontDoorEnd] = DOORS[2];
 
   return (
-    <g>
-      <ellipse cx={W / 2} cy="1" rx={W / 2 + 4} ry="4" fill="#000" opacity="0.28" />
+    <g transform={`scale(${BUS_SCALE})`}>
+      <defs>
+        <clipPath id={bodyClip}>
+          <path d={BODY_PATH} />
+        </clipPath>
+        <clipPath id={clusterClip}>
+          <rect x="88" y="-53" width="97" height="40" />
+        </clipPath>
+        <linearGradient id={glass} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3A3A3A" />
+          <stop offset=".5" stopColor="#6A6A6A" />
+          <stop offset="1" stopColor="#2C2C2C" />
+        </linearGradient>
+      </defs>
+
+      <ellipse cx="192.5" cy="0.5" rx="198" ry="5" fill="#000" opacity="0.28" />
       {/* farol no chão */}
-      <polygon points={`${W},-14 ${W + 90},-2 ${W + 90},4 ${W},-8`} fill="url(#bus-beam)" />
+      <polygon points="385,-30 520,-6 520,4 385,-20" fill="url(#bus-beam)" />
 
-      {/* ar-condicionado no teto */}
-      <rect x="34" y="-62" width="46" height="5" rx="2" fill={PAINT.greenLight} />
-      <rect x="96" y="-61" width="26" height="4" rx="2" fill={PAINT.greenLight} />
-
-      <clipPath id={clipId}>
-        <path d={body} />
-      </clipPath>
-      <g clipPath={`url(#${clipId})`}>
-        <rect x="0" y="-60" width={W + 2} height="52" fill={PAINT.green} />
-        <rect x="0" y="-58" width={W + 2} height="3" fill={PAINT.greenLight} />
-
-        {/* faixa inferior: seta prata e seta grafite contornadas de branco,
-            e o painel grafite seguindo até a porta */}
-        <polygon points={`20,${TOP} 46,${TOP} ${46 - D},${MID} 46,${BOTTOM} 20,${BOTTOM} ${20 - D},${MID}`} fill={PAINT.silver} />
-        <polygon points={`46,${TOP} ${DOOR_X - 11},${TOP} ${DOOR_X - 11},${BOTTOM} 46,${BOTTOM} ${46 - D},${MID}`} fill={PAINT.graphite} />
-        {[20, 46, 72].map((x) => (
-          <polyline key={x} points={chevron(x - D, D, TOP, BOTTOM)} fill="none" stroke={PAINT.white} strokeWidth="2" strokeLinejoin="round" />
-        ))}
-        {/* frente: painel grafite com seta branca */}
-        <polygon points={`${W - 22},-24 ${W - 5},-24 ${W - 5},-17 ${W - 22},-17 ${W - 26},-20.5`} fill={PAINT.graphite} />
-        <polyline points={chevron(W - 26, 4, -24, -17)} fill="none" stroke={PAINT.white} strokeWidth="1.4" strokeLinejoin="round" />
-
-        {/* saia */}
-        <rect x="0" y="-14" width={W + 2} height="4" fill={PAINT.greenDark} />
-
-        {/* janelas contínuas com colunas */}
-        <rect x="8" y="-52" width={W - 46} height="19" rx="2" fill={PAINT.glass} />
-        {[30, 52, 74, 96].map((x) => (
-          <rect key={x} x={x} y="-52" width="2" height="19" fill="#151A17" />
-        ))}
-        <rect x="11" y="-50" width="5" height="15" rx="1" fill={CYAN} opacity="0.22" />
-        <rect x="56" y="-50" width="5" height="15" rx="1" fill={CYAN} opacity="0.18" />
-
-        {/* máscara preta da frente e para-brisa */}
-        <path d={`M${W - 34},-58 L${W - 16},-58 Q${W - 3},-58 ${W},-45 L${W},-27 L${W - 34},-27 Z`} fill={PAINT.mask} />
-        <path d={`M${W - 30},-52 L${W - 14},-52 Q${W - 6},-51 ${W - 4},-43 L${W - 4},-31 L${W - 30},-31 Z`} fill={PAINT.glass} />
-        <rect x={W - 26} y="-50" width="4" height="16" rx="1" fill={CYAN} opacity="0.3" />
-        {/* letreiro lateral */}
-        <rect x={W - 82} y="-57" width="44" height="5" rx="1.5" fill={PAINT.mask} />
-        <text x={W - 60} y="-53.1" textAnchor="middle" fontSize="4.6" fontWeight="700" letterSpacing="0.8" fill="#EDEDED">
-          PORTAL BI
-        </text>
-      </g>
-
-      {/* porta: moldura verde, folhas de vidro que abrem nos pontos */}
-      <rect x={DOOR_X - 10} y="-52" width="20" height="41" rx="2" fill={PAINT.greenDark} />
-      <rect x={DOOR_X - 9} y="-51" width="18" height="39" rx="1.5" fill="#151A17" />
-      {[0, 1].map((i) => (
-        <rect
-          key={i}
-          ref={(el) => {
-            doorRefs.current[i] = el;
-          }}
-          x={i === 0 ? DOOR_X - 9 : DOOR_X}
-          y="-51"
-          width="9"
-          height="39"
-          rx="1.5"
-          fill={PAINT.glass}
-          stroke={PAINT.green}
-          strokeWidth="1"
-        />
+      {/* teto: ar-condicionado e escotilhas */}
+      <rect x="141" y="-98.5" width="103" height="7" rx="3.5" fill={PAINT.green} stroke={PAINT.greenDark} strokeWidth="0.8" />
+      {ROOF_HATCHES.map(([a, b]) => (
+        <rect key={a} x={a} y="-95.5" width={b - a} height="3.2" rx="1.6" fill={PAINT.green} stroke={PAINT.greenDark} strokeWidth="0.7" />
       ))}
 
-      {/* retrovisor, luzes */}
-      <path d={`M${W - 1},-48 L${W + 5},-46 L${W + 5},-38`} fill="none" stroke={PAINT.mask} strokeWidth="2" strokeLinecap="round" />
-      <circle cx={W - 2} cy="-19" r="2.6" fill="#FFF6D0" />
-      <rect x="4" y="-28" width="3" height="9" rx="1" fill="#E5484D" />
+      <g clipPath={`url(#${bodyClip})`}>
+        <rect x="0" y="-100" width="387" height="90" fill={PAINT.green} />
+
+        {/* faixa do teto: frisos brancos e bloco cinza */}
+        <polygon points="111,-93 116,-93 123,-84 118,-84" fill={PAINT.white} />
+        <polygon points="161,-93 186,-93 193,-84 154,-84" fill={PAINT.gray} />
+        <polygon points="156,-93 160.5,-93 153.5,-84 149,-84" fill={PAINT.white} />
+        <polygon points="187.5,-93 192,-93 199,-84 194.5,-84" fill={PAINT.white} />
+        <polygon points="277,-93 282,-93 289,-84 284,-84" fill={PAINT.white} />
+        <text x="255" y="-86" textAnchor="middle" fontSize="5.2" fontWeight="700" letterSpacing="1.6" fill={PAINT.graphite}>
+          PORTAL BI
+        </text>
+
+        {/* faixa das janelas */}
+        <rect x="0" y="-84" width="362" height="31" fill={PAINT.band} />
+        {WINDOWS.map(([a, b]) => (
+          <rect key={a} x={a} y="-82.5" width={b - a} height="28" rx="3" fill={`url(#${glass})`} />
+        ))}
+
+        {/* traseira: seta branca ">" */}
+        <polyline points="31,-53 45,-40 18,-13" fill="none" stroke={PAINT.white} strokeWidth="5" />
+
+        {/* losangos entre a porta traseira e a do meio */}
+        <g clipPath={`url(#${clusterClip})`}>
+          <rect x="88" y="-53" width="97" height="40" fill={PAINT.green} />
+          <polygon points={diamond(112, -51, 27)} fill={PAINT.gray} stroke={PAINT.white} strokeWidth="4" />
+          <polygon points={diamond(186, -58, 30)} fill={PAINT.gray} stroke={PAINT.white} strokeWidth="4" />
+          <polygon points={diamond(150, -32, 29)} fill={PAINT.graphite} stroke={PAINT.white} strokeWidth="4" />
+          <polygon points={diamond(98, -42, 5.5)} fill={PAINT.graphite} stroke={PAINT.white} strokeWidth="2.2" />
+        </g>
+
+        {/* painel grafite com ponta ">" antes da porta da frente */}
+        <polygon points="219,-53 316,-53 325,-42.5 316,-32 219,-32" fill={PAINT.graphite} />
+        <polyline points="319.5,-53 329,-42.5 319.5,-32" fill="none" stroke={PAINT.white} strokeWidth="3" />
+        <rect x="250" y="-27" width="15" height="12" rx="1" fill="#3F4A26" opacity="0.55" />
+        <rect x="266" y="-27" width="15" height="12" rx="1" fill="#3F4A26" opacity="0.55" />
+
+        {/* frente: máscara preta e para-brisa */}
+        <path d="M362,-93 L352,-93 Q373,-93 379,-82 L385,-56 L385,-40 L364,-40 L362,-53 Z" fill={PAINT.band} />
+        <path d="M366,-86 Q374,-86 377,-78 L382,-56 L382,-45 L367,-45 Z" fill={`url(#${glass})`} opacity="0.9" />
+        <rect x="379" y="-34" width="5" height="4" rx="1.5" fill="#FFF6D0" />
+      </g>
+
+      {/* portas (a da frente abre nos pontos) */}
+      {DOORS.map(([a, b]) => {
+        const mid = (a + b) / 2;
+        const leaves = [
+          [a + 1.5, mid - 0.8],
+          [mid + 0.8, b - 1.5],
+        ];
+        const isFront = a === frontDoorStart && b === frontDoorEnd;
+        return (
+          <g key={a}>
+            <rect x={a} y="-84" width={b - a} height="70" fill={PAINT.band} />
+            {leaves.map(([l0, l1], i) => (
+              <g
+                key={i}
+                ref={
+                  isFront
+                    ? (el) => {
+                        doorRefs.current[i] = el;
+                      }
+                    : undefined
+                }
+              >
+                <rect x={l0} y="-82" width={l1 - l0} height="67" rx="1.6" fill={PAINT.green} />
+                <rect x={l0 + 1.6} y="-80" width={l1 - l0 - 3.2} height="28" rx="1.5" fill={`url(#${glass})`} />
+                <rect x={l0 + 1.6} y="-49.5" width={l1 - l0 - 3.2} height="32.5" rx="1.5" fill={`url(#${glass})`} />
+              </g>
+            ))}
+          </g>
+        );
+      })}
+
+      {/* retrovisor */}
+      <path d="M378,-84 Q388,-84 389,-78 L389,-70" fill="none" stroke={PAINT.band} strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="386.5" y="-72" width="5" height="10" rx="1.6" fill={PAINT.band} />
 
       {/* caixas de roda e rodas */}
-      {wheelsX.map((cx, i) => (
-        <g key={cx} transform={`translate(${cx} -9)`}>
-          <path d="M-13,-1 A13,13 0 0 1 13,-1 Z" fill="#141414" />
-          <circle r="10" fill="#161616" stroke="#2E2E2E" strokeWidth="1.5" />
+      {WHEELS.map((cx, i) => (
+        <g key={cx} transform={`translate(${cx} -15)`}>
+          <path d="M-20,2 A20,20 0 0 1 20,2 Z" fill="#222" />
+          <circle r="15" fill="#151515" />
           <g
             ref={(el) => {
               wheelRefs.current[i] = el;
             }}
           >
-            <circle r="5.2" fill="#BDBDBD" />
-            <circle r="2" fill="#7A7A7A" />
-            {[0, 60, 120].map((a) => (
-              <rect key={a} x="-0.7" y="-5" width="1.4" height="10" fill="#8F8F8F" transform={`rotate(${a})`} />
+            <circle r="9.5" fill="#C9C9C9" stroke="#9A9A9A" strokeWidth="0.8" />
+            {RIM_BOLTS.map(([x, y], k) => (
+              <circle key={k} cx={x.toFixed(2)} cy={y.toFixed(2)} r="1.1" fill="#8A8A8A" />
             ))}
+            <circle r="3.4" fill="#A8A8A8" stroke="#7A7A7A" strokeWidth="0.7" />
           </g>
         </g>
       ))}
