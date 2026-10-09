@@ -47,15 +47,32 @@ const BUILDINGS = Array.from({ length: 16 }, (_, i) => {
   return { x: i * (SKYLINE_W / 16) + r(3) * 10, w, h, lit: Array.from({ length: 4 }, (_, k) => r(4 + k) > 0.62) };
 });
 
+/** Entrada do recarregar: ônibus chega pela esquerda sobre o relatório… */
+const INTRO_ENTER_S = 1.0;
+/** …o fundo escuro cobre o relatório enquanto ele freia… */
+const INTRO_BACKDROP = { start: 0.75, duration: 0.55 };
+/** …e a cidade e a estrada surgem em volta dele. */
+const INTRO_SCENE = { start: 1.05, duration: 0.7 };
+
+const progress = (t: number, { start, duration }: { start: number; duration: number }) =>
+  Math.min(1, Math.max(0, (t - start) / duration));
+
 interface BusLoaderProps {
   /** O relatório carregou: o ônibus parte e a tela some. */
   arriving: boolean;
   onDone: () => void;
   /** Painel em segundo plano: não anima (economiza CPU). */
   paused?: boolean;
+  /**
+   * Entrada do recarregar: fundo transparente no começo (o relatório atual
+   * continua visível), o ônibus entra pela esquerda e só depois o cenário
+   * cobre a tela. `onCovered` avisa quando já dá para recarregar por baixo.
+   */
+  intro?: boolean;
+  onCovered?: () => void;
 }
 
-export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) {
+export function BusLoader({ arriving, onDone, paused = false, intro = false, onCovered }: BusLoaderProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [caption, setCaption] = useState(STOPS[0].caption);
@@ -69,6 +86,11 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
   const wheelRefs = useRef<(SVGGElement | null)[]>([]);
   const doorRefs = useRef<(SVGRectElement | null)[]>([]);
   const puffRefs = useRef<(SVGCircleElement | null)[]>([]);
+  // Partes que aparecem depois do ônibus na entrada do recarregar.
+  const sceneRef = useRef<SVGGElement>(null);
+  const edgesRef = useRef<SVGRectElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const captionRef = useRef<HTMLDivElement>(null);
 
   const state = useRef({
     distance: 0, // quanto o mundo andou
@@ -82,12 +104,17 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
     puffs: [0, 0, 0].map(() => ({ x: 0, y: 0, life: 0 })),
     puffTimer: 0,
     leftGarage: false,
+    introT: 0,
+    introDone: !intro,
+    covered: !intro,
     done: false,
   });
   const arrivingRef = useRef(arriving);
   arrivingRef.current = arriving;
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const onCoveredRef = useRef(onCovered);
+  onCoveredRef.current = onCovered;
 
   // Cena ampliada em telas grandes; as contas abaixo usam a largura "virtual".
   const scale = width >= 900 ? 1.4 : width >= 600 ? 1.2 : 1;
@@ -107,8 +134,19 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
   const reduceMotion =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   useEffect(() => {
-    if ((paused || reduceMotion) && arriving && !state.current.done) {
-      state.current.done = true;
+    const s = state.current;
+    if (!(paused || reduceMotion)) return;
+    if (!s.covered) {
+      // Sem animação a entrada não acontece: mostra tudo e libera o recarregar.
+      s.covered = true;
+      s.introDone = true;
+      [sceneRef.current, edgesRef.current, backdropRef.current, captionRef.current].forEach((el) =>
+        el?.style.setProperty("opacity", "1")
+      );
+      onCoveredRef.current?.();
+    }
+    if (arriving && !s.done) {
+      s.done = true;
       onDoneRef.current();
     }
   }, [arriving, paused, reduceMotion]);
@@ -123,13 +161,41 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      if (arrivingRef.current && !s.leaving) {
+      if (!s.introDone) {
+        // Entrada: o ônibus freia vindo da esquerda; o cenário surge em volta.
+        s.introT += dt;
+        const startX = -(busLeft + BUS_W + 30);
+        const e = Math.min(1, s.introT / INTRO_ENTER_S);
+        const prevX = s.busX;
+        s.busX = startX * Math.pow(1 - e, 3);
+        s.speed = dt > 0 ? (s.busX - prevX) / dt : 0;
+        const back = progress(s.introT, INTRO_BACKDROP);
+        const scene = progress(s.introT, INTRO_SCENE);
+        const sceneEase = 1 - Math.pow(1 - scene, 2);
+        backdropRef.current?.style.setProperty("opacity", back.toFixed(3));
+        sceneRef.current?.style.setProperty("opacity", sceneEase.toFixed(3));
+        sceneRef.current?.setAttribute("transform", `translate(0 ${((1 - sceneEase) * 10).toFixed(2)})`);
+        edgesRef.current?.style.setProperty("opacity", sceneEase.toFixed(3));
+        captionRef.current?.style.setProperty("opacity", sceneEase.toFixed(3));
+        // Fundo opaco: o relatório já está coberto, pode recarregar por baixo.
+        if (back >= 1 && !s.covered) {
+          s.covered = true;
+          onCoveredRef.current?.();
+        }
+        if (e >= 1 && scene >= 1) {
+          s.introDone = true;
+          s.busX = 0;
+          s.speed = 0;
+        }
+      } else if (arrivingRef.current && !s.leaving) {
         s.leaving = true;
         s.dwellUntil = 0;
         setCaption("Chegamos! Bom trabalho.");
       }
 
-      if (s.leaving) {
+      if (!s.introDone) {
+        // (entrada em andamento: nada além dela)
+      } else if (s.leaving) {
         s.door = Math.max(0, s.door - dt * 6);
         s.speed = Math.min(1400, s.speed + 2600 * dt);
         s.busX += s.speed * dt;
@@ -170,7 +236,8 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
 
       // fumacinha ao acelerar
       s.puffTimer -= dt;
-      const accelerating = s.leaving || (!s.dwellUntil && s.speed > 20 && s.speed < CRUISE * 0.8);
+      const accelerating =
+        s.leaving || (!s.introDone && s.speed > 40) || (s.introDone && !s.dwellUntil && s.speed > 20 && s.speed < CRUISE * 0.8);
       if (accelerating && s.puffTimer <= 0) {
         const p = s.puffs.find((q) => q.life <= 0);
         if (p) Object.assign(p, { x: busLeft + s.busX - 4, y: ROAD_Y + 6, life: 1 });
@@ -217,12 +284,13 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
   const stopX = (k: number) => busLeft + DOOR_X + k * spacing;
 
   return (
-    <div ref={wrapRef} className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-4">
+    <div ref={wrapRef} className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden px-4">
+      <div ref={backdropRef} className="absolute inset-0 bg-background" style={{ opacity: intro ? 0 : 1 }} />
       <svg
         width="100%"
         height={HEIGHT * scale}
         viewBox={`0 0 ${vw} ${HEIGHT}`}
-        className="max-w-full select-none"
+        className="relative max-w-full select-none overflow-visible"
         aria-hidden="true"
       >
         <defs>
@@ -238,6 +306,7 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
           </linearGradient>
         </defs>
 
+        <g ref={sceneRef} style={{ opacity: intro ? 0 : 1 }}>
         {/* horizonte */}
         <g ref={skylineRef}>
           {[0, 1, 2].map((rep) =>
@@ -278,6 +347,7 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
             <BusStop key={k} x={stopX(k)} stop={STOPS[k % STOPS.length]} />
           ))}
         </g>
+        </g>
 
         {/* fumaça */}
         {[0, 1, 2].map((i) => (
@@ -293,7 +363,7 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
         ))}
 
         {/* ônibus */}
-        <g ref={busRef} transform={`translate(${busLeft} 0)`}>
+        <g ref={busRef} transform={`translate(${intro ? -BUS_W - 30 : busLeft} 0)`}>
           <g
             transform={`translate(0 ${ROAD_Y + 8})`}
             onClick={() => setHonk((n) => n + 1)}
@@ -313,13 +383,24 @@ export function BusLoader({ arriving, onDone, paused = false }: BusLoaderProps) 
         </g>
 
         {/* bordas esfumaçadas */}
-        <rect x="0" y="0" width={vw} height={HEIGHT} fill="url(#bus-fade)" pointerEvents="none" />
+        <rect
+          ref={edgesRef}
+          x="0"
+          y="0"
+          width={vw}
+          height={HEIGHT}
+          fill="url(#bus-fade)"
+          pointerEvents="none"
+          style={{ opacity: intro ? 0 : 1 }}
+        />
       </svg>
 
-      <p key={caption} className="mt-2 min-h-[22px] animate-rise-in text-center text-[15px] text-foreground/90" aria-live="polite">
-        {caption}
-      </p>
-      <p className="mt-1 text-center text-xs text-tertiary">Carregando o painel do Power BI</p>
+      <div ref={captionRef} className="relative" style={{ opacity: intro ? 0 : 1 }}>
+        <p key={caption} className="mt-2 min-h-[22px] animate-rise-in text-center text-[15px] text-foreground/90" aria-live="polite">
+          {caption}
+        </p>
+        <p className="mt-1 text-center text-xs text-tertiary">Carregando o painel do Power BI</p>
+      </div>
     </div>
   );
 }
