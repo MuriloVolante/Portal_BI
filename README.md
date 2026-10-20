@@ -94,6 +94,9 @@ pessoa cria a senha nova direto no login.
 
 - Cada abertura de painel é registrada (quem, qual, quando), inclusive ao voltar
   para um painel que ficou aberto.
+- O **último acesso** também conta quando a pessoa volta para uma aba do portal
+  que já estava aberta (aba reaparece, janela recebe foco ou clique no relatório),
+  sem inflar o gráfico de aberturas.
 - **Visão geral** com acessos por dia nas últimas 2 semanas, painéis mais abertos
   e as **contas sem acesso há mais de 30 dias**.
 - Lista de usuários com **último acesso**, ordenável por nome ou data, e a
