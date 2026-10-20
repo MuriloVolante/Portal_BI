@@ -18,7 +18,7 @@ export interface InactiveUser {
   id: string;
   name: string | null;
   email: string;
-  /** Último acesso (abertura de painel, ou último login se nunca abriu); null = nunca. */
+  /** Último acesso (última vez no portal, ou último login se nunca houve registro); null = nunca. */
   lastAccess: string | null;
   /** Dias desde o último acesso; null = nunca. */
   days: number | null;

@@ -41,6 +41,6 @@ export interface AdminUserRow {
   banned: boolean;
   /** Último login (Supabase Auth) — null se nunca entrou. */
   last_sign_in_at: string | null;
-  /** Último acesso real (abertura de dashboard) — null se nunca usou. */
+  /** Última vez no portal (abertura ou retorno à aba) — null se nunca usou. */
   last_seen_at: string | null;
 }
