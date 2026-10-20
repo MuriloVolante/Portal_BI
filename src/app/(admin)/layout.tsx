@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { APP_VERSION } from "@/lib/version";
 import { AdminNav, AdminTabBar } from "@/components/admin/AdminNav";
 import { SidebarFrame, footerLinkClass } from "@/components/shell/SidebarFrame";
+import { PresenceBeacon } from "@/components/shell/PresenceBeacon";
 
 export default async function AdminLayout({
   children,
@@ -12,6 +13,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-[100dvh] overflow-hidden">
+      <PresenceBeacon />
       <SidebarFrame
         tag="admin"
         sectionLabel="Administração"

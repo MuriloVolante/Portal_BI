@@ -51,7 +51,7 @@ function InactiveList({ users }: { users: InactiveUser[] }) {
   if (!users.length) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
-        Todo mundo abriu algum painel nos últimos {INACTIVE_DAYS} dias.
+        Todo mundo entrou no portal nos últimos {INACTIVE_DAYS} dias.
       </p>
     );
   }
@@ -164,8 +164,8 @@ export default async function AdminOverviewPage() {
             )}
           </CardTitle>
           <CardDescription>
-            Contas ativas que não abrem um painel há mais de um mês, ou que nunca abriram. Avalie se ainda precisam
-            de acesso.
+            Contas ativas que não entram no portal há mais de um mês, ou que nunca entraram. Avalie se ainda
+            precisam de acesso.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -27,7 +27,7 @@ const FIRST_DIR: Record<SortKey, SortDir> = { name: "asc", lastAccess: "desc" };
 
 const nameCollator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
 
-/** Mesmo valor exibido na coluna: uso real, ou o último login se nunca abriu painel. */
+/** Mesmo valor exibido na coluna: última vez no portal, ou o último login se nunca houve registro. */
 function lastAccessOf(user: AdminUserRow) {
   return user.last_seen_at ?? user.last_sign_in_at;
 }
@@ -163,8 +163,8 @@ export function UserTable({ rows }: UserTableProps) {
                   </TableCell>
                   <TableCell className="hidden tabular-nums md:table-cell">{user.page_count}</TableCell>
                   <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
-                    {/* Uso real (abertura de dashboard); antes do primeiro
-                        registro, cai no último login do Auth */}
+                    {/* Última vez no portal (abertura ou retorno à aba); antes
+                        do primeiro registro, cai no último login do Auth */}
                     {formatDateTimeBR(lastAccessOf(user))}
                   </TableCell>
                   <TableCell className="pr-5 text-right">
