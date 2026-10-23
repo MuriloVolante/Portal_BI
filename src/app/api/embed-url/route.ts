@@ -97,15 +97,16 @@ export async function GET(request: NextRequest) {
 
   // 4. Registra o acesso: último acesso no profile + linha no histórico.
   // Falhas aqui não bloqueiam o dashboard (supabase-js não lança exceção).
+  // Mesmo horário nos dois lugares: último acesso = último registro do histórico.
+  const now = new Date().toISOString();
   await Promise.all([
-    admin
-      .from("profiles")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("id", user.id),
+    admin.from("profiles").update({ last_seen_at: now }).eq("id", user.id),
     admin.from("access_logs").insert({
       user_id: user.id,
       page_id: page.id,
       page_label: page.label,
+      kind: "open",
+      created_at: now,
     }),
   ]);
 

@@ -96,7 +96,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
       admin.from("user_pages").select("page_id").eq("user_id", user.id),
       admin
         .from("access_logs")
-        .select("id, page_id, page_label, created_at")
+        .select("id, page_id, page_label, created_at, kind")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(15),
@@ -117,6 +117,7 @@ async function getUserDetails(id: string): Promise<UserDetails | null> {
       page_label: log.page_label,
       icon: log.page_id ? iconByPageId.get(log.page_id) : null,
       created_at: log.created_at,
+      kind: log.kind === "return" ? "return" : "open",
     })),
     resetUntil,
   };
@@ -197,7 +198,7 @@ export default async function UserEditPage({ params }: UserEditPageProps) {
         <Card className="stagger" style={stagger(2)}>
           <CardHeader>
             <CardTitle>Atividade recente</CardTitle>
-            <CardDescription>Últimos dashboards abertos por este usuário.</CardDescription>
+            <CardDescription>Últimos acessos ao portal: painéis abertos e retornos a uma aba que já estava aberta.</CardDescription>
           </CardHeader>
           <CardContent>
             <ActivityList entries={activity} />
