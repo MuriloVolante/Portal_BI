@@ -30,7 +30,7 @@ export interface OverviewData {
   permissions: { total: number; usersWithAccess: number };
   /** Acessos por dia, do mais antigo ao mais recente (14 dias). */
   daily: { key: string; label: string; weekday: string; count: number }[];
-  /** Painéis mais abertos no mesmo período. */
+  /** Painéis mais acessados no mesmo período. */
   topPages: { label: string; count: number }[];
   periodTotal: number;
   /** Contas ativas sem acesso há mais de INACTIVE_DAYS (nunca primeiro). */
@@ -56,7 +56,9 @@ function findInactive(
     .map(({ id, name, email, lastAccess, days }) => ({ id, name, email, lastAccess, days }));
 }
 
-function aggregate(logs: { created_at: string; page_label: string }[]) {
+type LogRow = { created_at: string; page_label: string; page_id?: string | null };
+
+function aggregate(logs: LogRow[]) {
   const now = Date.now();
   const daily = Array.from({ length: DAYS }, (_, i) => {
     const d = new Date(now - (DAYS - 1 - i) * DAY_MS);
@@ -71,7 +73,8 @@ function aggregate(logs: { created_at: string; page_label: string }[]) {
     if (!bucket) continue;
     bucket.count++;
     periodTotal++;
-    byPage.set(log.page_label, (byPage.get(log.page_label) ?? 0) + 1);
+    // Ranking só de painéis (retorno ao portal sem painel na tela fica fora).
+    if (log.page_id !== null) byPage.set(log.page_label, (byPage.get(log.page_label) ?? 0) + 1);
   }
 
   const topPages = Array.from(byPage, ([label, count]) => ({ label, count }))
@@ -123,7 +126,7 @@ export async function getOverviewData(): Promise<OverviewData> {
     admin.from("user_pages").select("user_id"),
     admin
       .from("access_logs")
-      .select("created_at, page_label")
+      .select("created_at, page_label, page_id")
       .gte("created_at", sincePeriod)
       .order("created_at", { ascending: false })
       .limit(20000),
@@ -146,7 +149,7 @@ export async function getOverviewData(): Promise<OverviewData> {
     users: { total: users.length, banned, seenLast24h: seenRes.count ?? 0 },
     pages: { total: pages.length, active: pages.filter((p) => p.is_active).length },
     permissions: { total: perms.length, usersWithAccess: new Set(perms.map((p) => p.user_id)).size },
-    ...aggregate((logsRes.data ?? []) as { created_at: string; page_label: string }[]),
+    ...aggregate((logsRes.data ?? []) as LogRow[]),
     inactive: findInactive(
       users.map((u) => ({
         id: u.id,

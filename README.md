@@ -94,9 +94,9 @@ pessoa cria a senha nova direto no login.
 
 - Cada abertura de painel é registrada (quem, qual, quando), inclusive ao voltar
   para um painel que ficou aberto.
-- O **último acesso** também conta quando a pessoa volta para uma aba do portal
-  que já estava aberta (aba reaparece, janela recebe foco ou clique no relatório),
-  sem inflar o gráfico de aberturas.
+- Voltar para uma aba do portal que já estava aberta (aba reaparece, janela
+  recebe foco ou clique no relatório) também conta, como **retorno**. Último
+  acesso, gráfico e atividade recente vêm do mesmo histórico, então sempre batem.
 - **Visão geral** com acessos por dia nas últimas 2 semanas, painéis mais abertos
   e as **contas sem acesso há mais de 30 dias**.
 - Lista de usuários com **último acesso**, ordenável por nome ou data, e a
@@ -172,7 +172,7 @@ erDiagram
     AUTH_USERS ||--|| PROFILES : "1:1"
     AUTH_USERS ||--o{ USER_PAGES : "liberações"
     PAGES ||--o{ USER_PAGES : ""
-    AUTH_USERS ||--o{ ACCESS_LOGS : "aberturas"
+    AUTH_USERS ||--o{ ACCESS_LOGS : "acessos"
     PAGES ||--o{ ACCESS_LOGS : ""
 
     PROFILES {
@@ -199,6 +199,7 @@ erDiagram
         uuid user_id
         uuid page_id
         text page_label
+        text kind "open | return"
         timestamptz created_at
     }
 ```
@@ -328,7 +329,7 @@ src/
 │   ├── demo.ts                         # modo demo (dados em memória)
 │   └── version.ts                      # versão exibida na interface
 └── middleware.ts                       # proteção de rotas
-supabase/migrations/                    # 0001 base · 0002 atividade · 0003 redefinição de senha
+supabase/migrations/                    # 0001 base · 0002 atividade · 0003 redefinição de senha · 0004 tipo de acesso
 docs/                                   # contexto do projeto e imagens deste README
 ```
 

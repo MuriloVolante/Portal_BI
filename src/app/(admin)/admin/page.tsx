@@ -120,11 +120,11 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <Card className="stagger" style={{ "--i": 3 } as React.CSSProperties}>
+        <Card className="stagger relative z-10" style={{ "--i": 3 } as React.CSSProperties}>
           <CardHeader className="pb-4">
             <CardTitle>Acessos por dia</CardTitle>
             <CardDescription>
-              Últimas 2 semanas · {plural(data.periodTotal, "abertura", "aberturas")} de painel
+              Últimas 2 semanas · {plural(data.periodTotal, "acesso", "acessos")} (aberturas e retornos)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -140,7 +140,7 @@ export default async function AdminOverviewPage() {
 
         <Card className="stagger" style={{ "--i": 4 } as React.CSSProperties}>
           <CardHeader className="pb-4">
-            <CardTitle>Painéis mais abertos</CardTitle>
+            <CardTitle>Painéis mais acessados</CardTitle>
             <CardDescription>Mesmo período</CardDescription>
           </CardHeader>
           <CardContent>

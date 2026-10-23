@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 /** No máximo um aviso a cada 10 min por aba. */
 const THROTTLE_MS = 10 * 60_000;
@@ -13,14 +14,25 @@ const FOCUS_CHECK_MS = 15_000;
  * (o clique vai para o iframe, então a janela não recebe o evento "focus" —
  * por isso a conferência periódica de document.hasFocus()).
  *
- * Também avisa ao carregar (área admin e quem não tem painel liberado não
- * passam pelo registro de abertura de painel). Olhar uma janela que já estava
- * visível, sem clicar, não gera nenhum evento no navegador e não tem como ser
- * detectado.
+ * Cada aviso entra no histórico de acessos como "retorno", com o painel que
+ * está na tela. Abrir um painel já é registrado pelo próprio carregamento,
+ * então ao carregar só avisa fora de um painel (ex.: quem não tem painel
+ * liberado). Olhar uma janela que já estava visível, sem clicar, não gera
+ * nenhum evento no navegador e não tem como ser detectado.
  */
 export function PresenceBeacon() {
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  pathRef.current = pathname;
+
   useEffect(() => {
-    let lastSent = 0;
+    const panelSlug = () => {
+      const match = /^\/dashboard\/([^/]+)\/?$/.exec(pathRef.current);
+      return match ? decodeURIComponent(match[1]) : null;
+    };
+    // Num painel, o carregamento já conta como abertura: o próximo aviso só
+    // depois do intervalo.
+    let lastSent = panelSlug() ? Date.now() : 0;
     let hadFocus = document.hasFocus();
 
     function ping() {
@@ -28,7 +40,12 @@ export function PresenceBeacon() {
       const now = Date.now();
       if (now - lastSent < THROTTLE_MS) return;
       lastSent = now;
-      fetch("/api/presence", { method: "POST", keepalive: true }).catch(() => undefined);
+      fetch("/api/presence", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: panelSlug() }),
+      }).catch(() => undefined);
     }
 
     const onVisibility = () => {

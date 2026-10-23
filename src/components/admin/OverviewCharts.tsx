@@ -55,7 +55,13 @@ export function DailyAccessChart({ data }: { data: OverviewData["daily"] }) {
                 }}
               />
               {hover === i && (
-                <div className="pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded-lg border bg-popover px-2.5 py-1.5 text-xs shadow-[0_10px_24px_rgb(0_0_0/.4)]">
+                <div
+                  className={cn(
+                    "pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded-lg border bg-popover px-2.5 py-1.5 text-xs shadow-[0_10px_24px_rgb(0_0_0/.4)]",
+                    // centralizada na barra; nas pontas, alinhada para dentro do gráfico
+                    i < 2 ? "left-0" : i >= data.length - 2 ? "right-0" : "left-1/2 -translate-x-1/2"
+                  )}
+                >
                   <span className="text-muted-foreground">
                     {d.weekday}, {d.label}
                   </span>

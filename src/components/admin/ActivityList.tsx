@@ -8,14 +8,16 @@ export interface ActivityEntry {
   page_label: string;
   icon?: string | null;
   created_at: string;
+  /** open = abriu o painel; return = voltou para a aba que já estava aberta. */
+  kind?: "open" | "return";
 }
 
-/** Últimos dashboards abertos pelo usuário (dados de access_logs). */
+/** Últimos acessos do usuário (access_logs): aberturas de painel e retornos à aba. */
 export function ActivityList({ entries }: { entries: ActivityEntry[] }) {
   if (entries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Nenhum acesso registrado ainda. Os acessos passam a ser gravados a cada dashboard aberto.
+        Nenhum acesso registrado ainda.
       </p>
     );
   }
@@ -33,6 +35,11 @@ export function ActivityList({ entries }: { entries: ActivityEntry[] }) {
             <span className="flex min-w-0 items-center gap-2.5 text-sm font-medium">
               <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="truncate">{entry.page_label}</span>
+              {entry.kind === "return" && (
+                <span className="shrink-0 rounded-md bg-secondary px-1.5 py-px text-[11px] font-medium text-muted-foreground">
+                  retorno
+                </span>
+              )}
             </span>
             <span className="shrink-0 whitespace-nowrap text-[13px] tabular-nums text-tertiary">
               {formatDateTimeBR(entry.created_at, "—")}
